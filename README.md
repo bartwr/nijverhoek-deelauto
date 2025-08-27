@@ -136,10 +136,6 @@ Voor vragen over de deelauto:
 - **E-mail**: mail@bartroorda.nl
 - **Telefoon**: 06 463 86 864
 
-## 📄 Licentie
-
-© 2024 Deelauto Nijverhoek. Alle rechten voorbehouden.
-
 ## 🤝 Bijdragen
 
 Dit project is ontwikkeld voor de lokale gemeenschap in de Nijverhoek. Voor suggesties of verbeteringen, neem contact op via de bovenstaande contactgegevens.

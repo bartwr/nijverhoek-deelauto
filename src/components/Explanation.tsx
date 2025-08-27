@@ -1,3 +1,5 @@
+import Image from 'next/image'
+
 export function Explanation() {
 	return (
 		<section className="py-16 px-4 sm:px-6 lg:px-8 bg-white">
@@ -24,7 +26,7 @@ export function Explanation() {
 							Meer leefruimte
 						</h3>
 						<p className="text-gray-700">
-							1 deelauto vervangt gemiddeld 6 normale auto's. 
+							1 deelauto vervangt gemiddeld 6 normale auto&apos;s. 
 							Meer ruimte voor groen, speelplaatsen en ontmoeting.
 						</p>
 					</div>
@@ -40,7 +42,7 @@ export function Explanation() {
 							Duurzamer rijden
 						</h3>
 						<p className="text-gray-700">
-							Elektrische auto's rijden heerlijk en stoten minder broeikasgassen, 
+							Elektrische auto&apos;s rijden heerlijk en stoten minder broeikasgassen, 
 							stank, gifstoffen en fijnstof uit.
 						</p>
 					</div>
@@ -81,10 +83,12 @@ export function Explanation() {
 				{/* Bottom message */}
 				<div className="mt-12 text-center">
 					<div className="bg-gradient-to-r from-[#ea5c33]/10 to-[#ea5c33]/5 rounded-2xl p-8 shadow-lg border border-[#ea5c33]/20 max-w-4xl mx-auto">
-						<img 
+						<Image 
 							src="/infographics/stilstaand-blik.png" 
 							alt="Stilstaand blik - illustratie van parkeerplaatsen die ruimte innemen" 
-							className="w-full h-auto max-w-2xl mx-auto"
+							width={340}
+							height={205}
+							className="max-w-full h-auto max-w-2xl mx-auto"
 						/>
 						<div className="mt-4 text-sm text-gray-600">
 							Bron: <a 
