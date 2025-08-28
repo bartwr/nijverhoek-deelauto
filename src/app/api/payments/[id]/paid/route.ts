@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { connectToDatabase } from '@/lib/mongodb'
 import { UpdatePaymentPaidRequest, PaymentResponse } from '@/types/payment'
 import { ObjectId } from 'mongodb'
+import { Payment } from '@/types/payment'
 
 export async function PATCH(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<PaymentResponse>> {
 	try {
 		const body: UpdatePaymentPaidRequest = await request.json()
-		const { id } = params
+		const { id } = await params
 
 		// Validate payment ID
 		if (!id || !ObjectId.isValid(id)) {
@@ -71,7 +72,7 @@ export async function PATCH(
 		return NextResponse.json(
 			{
 				success: true,
-				data: updatedPayment,
+				data: updatedPayment as unknown as Payment,
 				message: 'Payment paid_at updated successfully'
 			},
 			{ status: 200 }
@@ -90,10 +91,10 @@ export async function PATCH(
 
 export async function GET(
 	request: NextRequest,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<PaymentResponse>> {
 	try {
-		const { id } = params
+		const { id } = await params
 
 		// Validate payment ID
 		if (!id || !ObjectId.isValid(id)) {
@@ -124,7 +125,7 @@ export async function GET(
 		return NextResponse.json(
 			{
 				success: true,
-				data: payment,
+				data: payment as unknown as Payment,
 				message: 'Payment retrieved successfully'
 			},
 			{ status: 200 }

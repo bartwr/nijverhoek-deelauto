@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectToDatabase } from '@/lib/mongodb'
-import { CreatePaymentRequest, PaymentResponse } from '@/types/payment'
+import { CreatePaymentRequest, PaymentResponse, Payment } from '@/types/payment'
 
 export async function POST(request: NextRequest): Promise<NextResponse<PaymentResponse>> {
 	try {
@@ -41,13 +41,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
 			amount_in_euros: roundedAmount,
 			is_business_transaction: body.is_business_transaction,
 			send_at: new Date(body.send_at),
-			paid_at: null
+			paid_at: undefined
 		}
 
 		const result = await db.collection('Payments').insertOne(payment)
 
 		if (result.acknowledged) {
-			const createdPayment = {
+			const createdPayment: Payment = {
 				...payment,
 				_id: result.insertedId.toString()
 			}
@@ -89,7 +89,7 @@ export async function GET(): Promise<NextResponse<PaymentResponse>> {
 		return NextResponse.json(
 			{
 				success: true,
-				data: payments,
+				data: payments as unknown as Payment[],
 				message: 'Payments retrieved successfully'
 			},
 			{ status: 200 }

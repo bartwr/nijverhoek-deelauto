@@ -1,6 +1,6 @@
-import { CreatePaymentRequest, UpdatePaymentPaidRequest } from '@/types/payment'
+import { CreatePaymentRequest } from '@/types/payment'
 
-export function validateCreatePaymentRequest(body: any): { isValid: boolean; errors: string[] } {
+export function validateCreatePaymentRequest(body: CreatePaymentRequest): { isValid: boolean; errors: string[] } {
 	const errors: string[] = []
 
 	if (!body.title || typeof body.title !== 'string' || body.title.trim().length === 0) {
@@ -38,7 +38,7 @@ export function validateCreatePaymentRequest(body: any): { isValid: boolean; err
 	}
 }
 
-export function validateUpdatePaymentPaidRequest(body: any): { isValid: boolean; errors: string[] } {
+export function validateUpdatePaymentPaidRequest(body: { paid_at: Date }): { isValid: boolean; errors: string[] } {
 	const errors: string[] = []
 
 	if (!body.paid_at) {
