@@ -14,7 +14,7 @@ export function ContactSection() {
 							</p>
 						</div>
 						
-						<div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+						<div className="grid md:grid-cols-1 gap-6 max-w-sm mx-auto">
 							<div className="bg-white/100 backdrop-blur-sm rounded-2xl p-6 border border-white/30">
 								<div className="space-y-3">
 									<div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto">
@@ -32,7 +32,7 @@ export function ContactSection() {
 								</div>
 							</div>
 							
-							<div className="bg-white/100 backdrop-blur-sm rounded-2xl p-6 border border-white/30">
+							{/* <div className="bg-white/100 backdrop-blur-sm rounded-2xl p-6 border border-white/30">
 								<div className="space-y-3">
 									<div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto">
 										<svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,7 +47,7 @@ export function ContactSection() {
 								06 463 86 864
 							</a>
 								</div>
-							</div>
+							</div> */}
 						</div>
 						
 					</div>

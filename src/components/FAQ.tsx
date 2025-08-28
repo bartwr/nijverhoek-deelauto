@@ -21,7 +21,7 @@ const faqData: FAQItem[] = [
 	},
 	{
 		question: 'Hoe kan ik gebruik maken van de auto?',
-		answer: 'In de eerste periode willen we met enkele huishoudens het concept testen. Bij interesse: geef dit door via <a href="mailto:auto@nijverhoek.nl">auto@nijverhoek.nl</a> of een bericht aan <a href="tel:0646386864">06 463 86 864</a>. Als je je hebt geïnformeerd en wilt deelnemen: maak voor elke bestuurder een <a href="https://mijn.deelauto.nl/" target="_blank">Deelauto-account</a> aan voor 20 euro per jaar, en je kunt rijden.',
+		answer: 'In de eerste periode willen we met enkele huishoudens het concept testen. Bij interesse: geef dit door via <a href="mailto:auto@nijverhoek.nl">auto@nijverhoek.nl</a>. Als je je hebt geïnformeerd en wilt deelnemen: maak voor elke bestuurder een <a href="https://mijn.deelauto.nl/" target="_blank">Deelauto-account</a> aan voor 20 euro per jaar, en je kunt rijden.',
 		icon: '📱'
 	},
 	{

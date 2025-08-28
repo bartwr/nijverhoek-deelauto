@@ -134,7 +134,6 @@ SEO-geoptimaliseerde metadata in `layout.tsx`:
 
 Voor vragen over de deelauto:
 - **E-mail**: auto@nijverhoek.nl
-- **Telefoon**: 06 463 86 864
 
 ## 🤝 Bijdragen
 
