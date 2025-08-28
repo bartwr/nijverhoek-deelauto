@@ -133,7 +133,7 @@ SEO-geoptimaliseerde metadata in `layout.tsx`:
 ## 📧 Contact
 
 Voor vragen over de deelauto:
-- **E-mail**: mail@bartroorda.nl
+- **E-mail**: auto@nijverhoek.nl
 - **Telefoon**: 06 463 86 864
 
 ## 🤝 Bijdragen

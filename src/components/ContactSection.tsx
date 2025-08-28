@@ -24,10 +24,10 @@ export function ContactSection() {
 									</div>
 									<h3 className="font-semibold text-black">E-mail</h3>
 																<a 
-								href="mailto:mail@bartroorda.nl" 
+								href="mailto:auto@nijverhoek.nl" 
 								className="text-[#ea5c33]/90 hover:text-black transition-colors duration-200 font-medium"
 							>
-								mail@bartroorda.nl
+								auto@nijverhoek.nl
 							</a>
 								</div>
 							</div>

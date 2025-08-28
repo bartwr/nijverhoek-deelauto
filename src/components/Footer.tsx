@@ -37,18 +37,10 @@ export function Footer() {
 						<div className="space-y-2 text-sm text-gray-300">
 							<p>
 								E-mail: <a 
-									href="mailto:mail@bartroorda.nl" 
+									href="mailto:auto@nijverhoek.nl" 
 									className="hover:text-[#ea5c33] transition-colors duration-200"
 								>
-									mail@bartroorda.nl
-								</a>
-							</p>
-							<p>
-								Telefoon: <a 
-									href="tel:0646386864" 
-									className="hover:text-[#ea5c33] transition-colors duration-200"
-								>
-									06 463 86 864
+									auto@nijverhoek.nl
 								</a>
 							</p>
 						</div>
