@@ -21,6 +21,20 @@ export const metadata: Metadata = {
     title: "Deelauto Nijverhoek",
     description: "Een auto in de buurt, voor de buurt. Je betaalt alleen voor wat je rijdt.",
     type: "website",
+    images: [
+      {
+        url: "/ladiedada.webp",
+        width: 1200,
+        height: 630,
+        alt: "Deelauto Nijverhoek - Gedeelde auto in de buurt",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Deelauto Nijverhoek",
+    description: "Een auto in de buurt, voor de buurt. Je betaalt alleen voor wat je rijdt.",
+    images: ["/ladiedada.webp"],
   },
   themeColor: "#ea5c33",
 };

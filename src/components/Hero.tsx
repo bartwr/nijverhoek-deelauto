@@ -37,7 +37,7 @@ export function Hero() {
 					<div className="relative">
 						<div className="relative rounded-2xl overflow-hidden shadow-2xl">
 							<Image
-								src="https://i.giphy.com/9Sxp3YOKKFEBi.webp"
+								src="/ladiedada.webp"
 								alt="Animated car sharing illustration"
 								width={600}
 								height={400}
