@@ -7,35 +7,35 @@ interface VideoItem {
 
 const videoData: VideoItem[] = [
 	{
+		title: 'Auto openen en sluiten',
+		embedId: '8mgaearQhJ81B8HwLbyaau'
+	},
+	{
+		title: 'Stoel beweegt bij instappen',
+		embedId: 'tFTAWSx3vr7Vc8FGDPEPrA'
+	},
+	{
+		title: 'Auto starten',
+		embedId: '9niJ77DWZrrFnc54LgYApy'
+	},
+	{
 		title: 'Spiegels instellen',
 		embedId: 'm47vLdJ3kGsYWZ4VhUjorU'
 	},
 	{
-		title: 'Stoel instellen',
-		embedId: '8mgaearQhJ81B8HwLbyaau'
-	},
-	{
-		title: 'Auto starten en stoppen',
-		embedId: 'tFTAWSx3vr7Vc8FGDPEPrA'
-	},
-	{
-		title: 'Laden van de auto',
-		embedId: '9niJ77DWZrrFnc54LgYApy'
-	},
-	{
-		title: 'Navigatie gebruiken',
+		title: 'Telefoon-connectie',
 		embedId: 'j8gcEfXHa94dvZuqWHaTBE'
 	},
 	{
-		title: 'Parkeren en manoeuvreren',
+		title: 'Toon mobiel op het scherm',
 		embedId: 'oGGjCRufVck5oLZr1N1KnU'
 	},
 	{
-		title: 'Verlichting en knoppen',
+		title: 'Cruise control',
 		embedId: '6xmiMKSGqGPKw7JdYAvrim'
 	},
 	{
-		title: 'Onderhoud en controle',
+		title: 'Laden en stoppen met laden',
 		embedId: '6kMqiReecXWUTTShACnYRB'
 	}
 ]
