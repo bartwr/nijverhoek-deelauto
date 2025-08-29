@@ -4,6 +4,8 @@ import { Hero } from '@/components/Hero'
 import { ContactSection } from '@/components/ContactSection'
 import { Footer } from '@/components/Footer'
 import { VideoInstructions } from '@/components/VideoInstructions'
+import { PWAInstaller } from '@/components/PWAInstaller'
+import { PWAInstallGuide } from '@/components/PWAInstallGuide'
 
 export default function Home() {
 	return (
@@ -15,6 +17,8 @@ export default function Home() {
 			<VideoInstructions />
 			<ContactSection />
 			<Footer />
+			<PWAInstaller />
+			<PWAInstallGuide />
 		</main>
 	)
 }
