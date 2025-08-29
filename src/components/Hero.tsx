@@ -1,4 +1,7 @@
+'use client'
+
 import Image from 'next/image'
+import { AppLinkButton } from './AppLinkButton'
 
 export function Hero() {
 	return (
@@ -45,9 +48,7 @@ export function Hero() {
 								priority
 							/>
 						</div>
-						<a href="https://mijn.deelauto.nl/" className="block absolute -bottom-4 -right-4 bg-[#ea5c33] text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg no-underline">
-							🚗 Open de app
-						</a>
+						<AppLinkButton />
 					</div>
 				</div>
 			</div>
