@@ -1,9 +1,18 @@
 'use client'
 
 import { useState } from 'react'
+import { usePWAStatus } from '@/lib/use-pwa-status'
+import { detectDevice } from '@/lib/device-utils'
 
 export function PWAInstallGuide() {
 	const [isOpen, setIsOpen] = useState(false)
+	const { isInstalled } = usePWAStatus()
+	const deviceInfo = detectDevice()
+
+	// Don't show the button if PWA is already installed or if not on mobile
+	if (isInstalled || !deviceInfo.isMobile) {
+		return null
+	}
 
 	return (
 		<>

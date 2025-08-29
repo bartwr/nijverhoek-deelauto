@@ -1,45 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-
-// Extend Navigator interface to include iOS-specific standalone property
-interface NavigatorWithStandalone extends Navigator {
-	standalone?: boolean
-}
+import { usePWAStatus } from '@/lib/use-pwa-status'
 
 export default function PWATestPage() {
-	const [pwaStatus, setPwaStatus] = useState({
-		isInstalled: false,
-		isStandalone: false,
-		hasServiceWorker: false,
-		canInstall: false,
-	})
-
-	useEffect(() => {
-		// Check if app is installed
-		const checkPWAStatus = () => {
-			const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-			// navigator.standalone is iOS-specific, so we need to check if it exists
-			const isInstalled = (navigator as NavigatorWithStandalone).standalone || isStandalone
-			const hasServiceWorker = 'serviceWorker' in navigator
-			const canInstall = 'BeforeInstallPromptEvent' in window
-
-			setPwaStatus({
-				isInstalled,
-				isStandalone,
-				hasServiceWorker,
-				canInstall,
-			})
-		}
-
-		checkPWAStatus()
-
-		// Listen for display mode changes
-		const mediaQuery = window.matchMedia('(display-mode: standalone)')
-		mediaQuery.addEventListener('change', checkPWAStatus)
-
-		return () => mediaQuery.removeEventListener('change', checkPWAStatus)
-	}, [])
+	const pwaStatus = usePWAStatus()
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-[#ea5c33]/5 via-white to-[#ea5c33]/5 p-4">
