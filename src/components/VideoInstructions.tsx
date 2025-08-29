@@ -42,13 +42,13 @@ const videoData: VideoItem[] = [
 
 export function VideoInstructions() {
 	return (
-		<section className="py-16 px-4 sm:px-6 lg:px-8 bg-white">
+		<section className="py-16 px-4 sm:px-6 lg:px-8 bg-white dark:bg-gray-900">
 			<div className="max-w-6xl mx-auto">
 				<div className="text-center mb-12">
-					<h2 className="text-3xl font-bold text-gray-900 mb-4">
+					<h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
 						Video instructies
 					</h2>
-					<p className="text-lg text-gray-600">
+					<p className="text-lg text-gray-600 dark:text-gray-300">
 						Leer hoe je de deelauto gebruikt met deze video handleidingen
 					</p>
 				</div>
@@ -57,10 +57,10 @@ export function VideoInstructions() {
 					{videoData.map((video, index) => (
 						<div
 							key={index}
-							className="bg-gray-50 rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-200 hover:shadow-md"
+							className="bg-gray-50 dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-600 overflow-hidden transition-all duration-200 hover:shadow-md"
 						>
 							<div className="p-6">
-								<h3 className="font-medium text-gray-900 text-lg mb-4 text-center">
+								<h3 className="font-medium text-gray-900 dark:text-gray-100 text-lg mb-4 text-center">
 									{video.title}
 								</h3>
 								<div className="aspect-video w-full">

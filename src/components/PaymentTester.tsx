@@ -127,14 +127,14 @@ export default function PaymentTester() {
 
 	return (
 		<div className="max-w-4xl mx-auto p-6 space-y-6">
-			<h2 className="text-2xl font-bold text-gray-900">Payment API Tester</h2>
+			<h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Payment API Tester</h2>
 			
 			{/* Create Payment Form */}
-			<div className="bg-white p-6 rounded-lg shadow-md">
-				<h3 className="text-lg font-semibold mb-4">Create New Payment</h3>
+			<div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+				<h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Create New Payment</h3>
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div>
-						<label className="block text-sm font-medium text-gray-700 mb-1">
+						<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 							Title *
 						</label>
 						<input
@@ -142,12 +142,12 @@ export default function PaymentTester() {
 							name="title"
 							value={formData.title}
 							onChange={handleInputChange}
-							className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+							className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
 							placeholder="Payment title"
 						/>
 					</div>
 					<div>
-						<label className="block text-sm font-medium text-gray-700 mb-1">
+						<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 							Amount (€) *
 						</label>
 						<input
@@ -157,12 +157,12 @@ export default function PaymentTester() {
 							min="0"
 							value={formData.amount_in_euros}
 							onChange={handleInputChange}
-							className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+							className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
 							placeholder="0.00"
 						/>
 					</div>
 					<div className="md:col-span-2">
-						<label className="block text-sm font-medium text-gray-700 mb-1">
+						<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 							Description *
 						</label>
 						<textarea
@@ -170,12 +170,12 @@ export default function PaymentTester() {
 							value={formData.description}
 							onChange={handleInputChange}
 							rows={3}
-							className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+							className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
 							placeholder="Payment description"
 						/>
 					</div>
 					<div>
-						<label className="block text-sm font-medium text-gray-700 mb-1">
+						<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
 							Send Date *
 						</label>
 						<input
@@ -183,7 +183,7 @@ export default function PaymentTester() {
 							name="send_at"
 							value={formData.send_at}
 							onChange={handleInputChange}
-							className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+							className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
 						/>
 					</div>
 					<div className="flex items-center">
@@ -192,9 +192,9 @@ export default function PaymentTester() {
 							name="is_business_transaction"
 							checked={formData.is_business_transaction}
 							onChange={handleInputChange}
-							className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+							className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
 						/>
-						<label className="ml-2 block text-sm text-gray-900">
+						<label className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
 							Business Transaction
 						</label>
 					</div>
@@ -220,9 +220,9 @@ export default function PaymentTester() {
 			)}
 
 			{/* Payments List */}
-			<div className="bg-white p-6 rounded-lg shadow-md">
+			<div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
 				<div className="flex justify-between items-center mb-4">
-					<h3 className="text-lg font-semibold">Payments List</h3>
+					<h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Payments List</h3>
 					<button
 						onClick={fetchPayments}
 						disabled={loading}
@@ -233,16 +233,16 @@ export default function PaymentTester() {
 				</div>
 				
 				{payments.length === 0 ? (
-					<p className="text-gray-500 text-center py-8">No payments found. Create one above or click Refresh.</p>
+					<p className="text-gray-500 dark:text-gray-400 text-center py-8">No payments found. Create one above or click Refresh.</p>
 				) : (
 					<div className="space-y-3">
 						{payments.map((payment) => (
-							<div key={payment._id} className="border border-gray-200 rounded-lg p-4">
+							<div key={payment._id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
 								<div className="flex justify-between items-start">
 									<div className="flex-1">
-										<h4 className="font-medium text-gray-900">{payment.title}</h4>
-										<p className="text-sm text-gray-600 mt-1">{payment.description}</p>
-										<div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+										<h4 className="font-medium text-gray-900 dark:text-gray-100">{payment.title}</h4>
+										<p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{payment.description}</p>
+										<div className="flex items-center gap-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
 											<span>€{payment.amount_in_euros.toFixed(2)}</span>
 											<span>{payment.is_business_transaction ? 'Business' : 'Personal'}</span>
 											<span>Sent: {new Date(payment.send_at).toLocaleDateString()}</span>

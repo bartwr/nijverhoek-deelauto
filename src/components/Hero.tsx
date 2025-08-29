@@ -6,11 +6,11 @@ export function Hero() {
 			<div className="max-w-7xl mx-auto">
 				<div className="grid lg:grid-cols-2 gap-12 items-center">
 					<div className="space-y-6">
-						<h2 className="text-4xl font-bold text-gray-900 leading-tight">
+						<h2 className="text-4xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
             <span className="text-[#ea5c33]">Een auto in de buurt,</span>{' '}
 							voor de buurt
 						</h2>
-						<p className="text-xl text-gray-600 leading-relaxed">
+						<p className="text-xl text-gray-600 dark:text-gray-300 leading-relaxed">
 							Je betaalt alleen voor wat je rijdt
 						</p>
 						<div className="flex flex-col sm:flex-row gap-4">
@@ -45,9 +45,9 @@ export function Hero() {
 								priority
 							/>
 						</div>
-						<div className="absolute -bottom-4 -right-4 bg-[#ea5c33] text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg">
-							🚗 Ladiedadaladiedada
-						</div>
+						<a href="https://mijn.deelauto.nl/" className="block absolute -bottom-4 -right-4 bg-[#ea5c33] text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg no-underline">
+							🚗 Open de app
+						</a>
 					</div>
 				</div>
 			</div>

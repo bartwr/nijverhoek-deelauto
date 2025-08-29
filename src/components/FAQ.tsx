@@ -49,13 +49,13 @@ export function FAQ() {
 	}
 
 	return (
-		<section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-50">
+		<section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-800">
 			<div className="max-w-4xl mx-auto">
 				<div className="text-center mb-12">
-					<h2 className="text-3xl font-bold text-gray-900 mb-4">
+					<h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
 						Veelgestelde vragen
 					</h2>
-					<p className="text-lg text-gray-600">
+					<p className="text-lg text-gray-600 dark:text-gray-300">
 						Alles wat je moet weten over de deelauto
 					</p>
 				</div>
@@ -64,15 +64,15 @@ export function FAQ() {
 					{faqData.map((item, index) => (
 						<div
 							key={index}
-							className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-200 hover:shadow-md"
+							className="bg-white dark:bg-gray-700 rounded-xl shadow-sm border border-gray-200 dark:border-gray-600 overflow-hidden transition-all duration-200 hover:shadow-md"
 						>
 							<button
 								onClick={() => toggleFAQ(index)}
-								className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
+								className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-200 cursor-pointer"
 							>
 								<div className="flex items-center space-x-4">
 									<span className="text-2xl">{item.icon}</span>
-									<span className="font-medium text-gray-900 text-lg">
+									<span className="font-medium text-gray-900 dark:text-gray-100 text-lg">
 										{item.question}
 									</span>
 								</div>
@@ -90,8 +90,8 @@ export function FAQ() {
 							
 							{openIndex === index && (
 								<div className="px-6 pb-4">
-									<div className="pt-2 border-t border-gray-100">
-										<p className="text-gray-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: item.answer }} />
+									<div className="pt-2 border-t border-gray-100 dark:border-gray-600">
+										<p className="text-gray-700 dark:text-gray-300 leading-relaxed" dangerouslySetInnerHTML={{ __html: item.answer }} />
 									</div>
 								</div>
 							)}
