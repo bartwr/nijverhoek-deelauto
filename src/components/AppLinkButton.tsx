@@ -15,7 +15,7 @@ export function AppLinkButton() {
 
 	return (
 		<a 
-			href={appLink}
+			href={isAndroid ? undefined : appLink}
 			target={isAndroid ? undefined : "_blank"}
 			onClick={handleAppClick}
 			className="block absolute -bottom-4 -right-4 bg-[#ea5c33] text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg no-underline"
