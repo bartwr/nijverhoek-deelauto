@@ -3,8 +3,14 @@
 import { useEffect, useState } from 'react'
 import { registerServiceWorker } from '@/lib/sw-register'
 
+// Define the type for the beforeinstallprompt event
+interface BeforeInstallPromptEvent extends Event {
+	prompt(): Promise<void>
+	userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
+
 export function PWAInstaller() {
-	const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+	const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
 	const [showInstallButton, setShowInstallButton] = useState(false)
 
 	useEffect(() => {
@@ -12,7 +18,7 @@ export function PWAInstaller() {
 		registerServiceWorker()
 
 		// Listen for beforeinstallprompt event
-		const handleBeforeInstallPrompt = (e: Event) => {
+		const handleBeforeInstallPrompt = (e: BeforeInstallPromptEvent) => {
 			e.preventDefault()
 			setDeferredPrompt(e)
 			setShowInstallButton(true)
@@ -25,11 +31,11 @@ export function PWAInstaller() {
 			console.log('PWA was installed')
 		}
 
-		window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+		window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener)
 		window.addEventListener('appinstalled', handleAppInstalled)
 
 		return () => {
-			window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+			window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener)
 			window.removeEventListener('appinstalled', handleAppInstalled)
 		}
 	}, [])

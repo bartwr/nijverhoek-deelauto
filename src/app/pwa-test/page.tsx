@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from 'react'
 
+// Extend Navigator interface to include iOS-specific standalone property
+interface NavigatorWithStandalone extends Navigator {
+	standalone?: boolean
+}
+
 export default function PWATestPage() {
 	const [pwaStatus, setPwaStatus] = useState({
 		isInstalled: false,
@@ -14,7 +19,8 @@ export default function PWATestPage() {
 		// Check if app is installed
 		const checkPWAStatus = () => {
 			const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-			const isInstalled = window.navigator.standalone || isStandalone
+			// navigator.standalone is iOS-specific, so we need to check if it exists
+			const isInstalled = (navigator as NavigatorWithStandalone).standalone || isStandalone
 			const hasServiceWorker = 'serviceWorker' in navigator
 			const canInstall = 'BeforeInstallPromptEvent' in window
 
@@ -106,8 +112,8 @@ export default function PWATestPage() {
 					<div className="mt-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
 						<h3 className="font-semibold text-orange-800 mb-2">📱 Installatie instructies:</h3>
 						<ul className="text-sm text-orange-700 space-y-1">
-							<li><strong>Android:</strong> Menu → "Toevoegen aan startscherm"</li>
-							<li><strong>iPhone:</strong> Deel-knop → "Zet op beginscherm"</li>
+							<li><strong>Android:</strong> Menu → &quot;Toevoegen aan startscherm&quot;</li>
+							<li><strong>iPhone:</strong> Deel-knop → &quot;Zet op beginscherm&quot;</li>
 						</ul>
 					</div>
 				</div>

@@ -51,7 +51,7 @@ export function PWAInstallGuide() {
 									<ol className="list-decimal list-inside text-sm text-gray-600 space-y-1">
 										<li>Open de website in Chrome</li>
 										<li>Tap op het menu (drie puntjes)</li>
-										<li>Kies "Toevoegen aan startscherm"</li>
+										<li>Kies &quot;Toevoegen aan startscherm&quot;</li>
 										<li>Bevestig de installatie</li>
 									</ol>
 								</div>
@@ -61,7 +61,7 @@ export function PWAInstallGuide() {
 									<ol className="list-decimal list-inside text-sm text-gray-600 space-y-1">
 										<li>Open de website in Safari</li>
 										<li>Tap op de deel-knop (vierkant met pijl)</li>
-										<li>Kies "Zet op beginscherm"</li>
+										<li>Kies &quot;Zet op beginscherm&quot;</li>
 										<li>Bevestig de installatie</li>
 									</ol>
 								</div>
