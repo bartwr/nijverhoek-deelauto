@@ -23,7 +23,7 @@ export default function AdminPage() {
 
 	const checkAuthStatus = async () => {
 		try {
-			const response = await fetch('/api/admin/check-auth')
+			const response = await fetch('/api/admin/check-auth');
 			if (response.ok) {
 				const data = await response.json()
 				if (data.isLoggedIn) {
@@ -80,7 +80,7 @@ export default function AdminPage() {
 
 	if (isLoggedIn && user) {
 		return (
-					<div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
 			{/* Topbar */}
 			<header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
 				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -90,9 +90,12 @@ export default function AdminPage() {
 						</h1>
 						<button
 							onClick={handleLogout}
-							className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+							className="
+                px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors
+                cursor-pointer
+              "
 						>
-							Logout
+							Log uit
 						</button>
 					</div>
 				</div>
@@ -104,13 +107,13 @@ export default function AdminPage() {
 					<nav className="mt-8">
 						<div className="px-4 space-y-2">
 							<a
-								href="#"
+								href="/admin"
 								className="block px-4 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-700 rounded-md"
 							>
 								Dashboard
 							</a>
 							<a
-								href="#"
+								href="/admin/maandincasso"
 								className="block px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors"
 							>
 								Maandincasso
@@ -123,10 +126,10 @@ export default function AdminPage() {
 				<main className="flex-1 p-8">
 					<div className="max-w-4xl">
 						<h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-							Hi there
+							Hoi {user.email}
 						</h2>
 						<p className="text-gray-600 dark:text-gray-300">
-							Welcome to the admin dashboard. You are logged in as {user.email}
+							Welkom bij het Deelauto Nijverhoek admin dashboard
 						</p>
 					</div>
 				</main>
@@ -165,9 +168,12 @@ export default function AdminPage() {
 						<button
 							type="submit"
 							disabled={isLoading}
-							className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+							className="
+                group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors
+                cursor-pointer
+              "
 						>
-							{isLoading ? 'Sending...' : 'Log in'}
+							{isLoading ? 'Mail wordt verstuurd...' : 'Log in'}
 						</button>
 					</div>
 

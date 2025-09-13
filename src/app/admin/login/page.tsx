@@ -9,7 +9,7 @@ function AdminLoginContent() {
 	const router = useRouter()
 	const searchParams = useSearchParams()
 
-			const validateToken = useCallback(async (token: string) => {
+  const validateToken = useCallback(async (token: string) => {
 		try {
 			const response = await fetch('/api/admin/validate-login', {
 				method: 'POST',
@@ -80,8 +80,8 @@ function AdminLoginContent() {
 		)
 	}
 
-			return null
-	}
+  return null
+}
 
 export default function AdminLoginPage() {
 	return (

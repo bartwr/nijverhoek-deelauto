@@ -36,7 +36,21 @@ export async function POST(
 		// Token expires in 15 minutes
 		const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
 
-		const { db } = await connectToDatabase()
+		// Connect to database with retry logic
+		let db
+		try {
+			const connection = await connectToDatabase()
+			db = connection.db
+		} catch (dbError) {
+			console.error('Database connection failed:', dbError)
+			return NextResponse.json(
+				{ 
+					error: 'Database connection failed. Please try again.',
+					details: process.env.NODE_ENV === 'development' ? (dbError instanceof Error ? dbError.message : String(dbError)) : undefined
+				},
+				{ status: 503 }
+			)
+		}
 
 		// Store the login token in the database
 		const loginToken: Omit<LoginToken, '_id'> = {
@@ -47,7 +61,18 @@ export async function POST(
 			createdAt: new Date()
 		}
 
-		await db.collection('LoginTokens').insertOne(loginToken)
+		try {
+			await db.collection('LoginTokens').insertOne(loginToken)
+		} catch (dbError) {
+			console.error('Failed to store login token:', dbError)
+			return NextResponse.json(
+				{ 
+					error: 'Failed to store login token. Please try again.',
+					details: process.env.NODE_ENV === 'development' ? (dbError instanceof Error ? dbError.message : String(dbError)) : undefined
+				},
+				{ status: 500 }
+			)
+		}
 
 		// Generate the login URL
 		const loginUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/login?token=${token}`
@@ -77,8 +102,25 @@ export async function POST(
 		})
 	} catch (error) {
 		console.error('Error sending login email:', error)
+		
+		// Provide more specific error messages based on error type
+		if (error instanceof Error) {
+			if (error.message.includes('MongoDB')) {
+				return NextResponse.json(
+					{ 
+						error: 'Database connection failed. Please try again.',
+						details: process.env.NODE_ENV === 'development' ? error.message : undefined
+					},
+					{ status: 503 }
+				)
+			}
+		}
+		
 		return NextResponse.json(
-			{ error: 'Failed to send login email' },
+			{ 
+				error: 'Failed to send login email',
+				details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
+			},
 			{ status: 500 }
 		)
 	}
