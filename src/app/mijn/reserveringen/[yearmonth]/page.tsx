@@ -140,6 +140,39 @@ export default function ReservationsPage() {
 		}
 	}
 
+	const getPreviousMonth = (yearmonth: string) => {
+		const [year, month] = yearmonth.split('-').map(Number)
+		const date = new Date(year, month - 1, 1)
+		date.setMonth(date.getMonth() - 1)
+		return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+	}
+
+	const getNextMonth = (yearmonth: string) => {
+		const [year, month] = yearmonth.split('-').map(Number)
+		const date = new Date(year, month - 1, 1)
+		date.setMonth(date.getMonth() + 1)
+		return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+	}
+
+	const formatMonthYear = (yearmonth: string) => {
+		const [year, month] = yearmonth.split('-').map(Number)
+		const date = new Date(year, month - 1, 1)
+		return date.toLocaleDateString('nl-NL', {
+			year: 'numeric',
+			month: 'long'
+		})
+	}
+
+	const handlePreviousMonth = () => {
+		const prevMonth = getPreviousMonth(yearmonth)
+		router.push(`/mijn/reserveringen/${prevMonth}`)
+	}
+
+	const handleNextMonth = () => {
+		const nextMonth = getNextMonth(yearmonth)
+		router.push(`/mijn/reserveringen/${nextMonth}`)
+	}
+
 	const sidebarItems = [
 		{ href: '/mijn', label: 'Start', isActive: false },
 		{ href: `/mijn/reserveringen/${yearmonth}`, label: 'Reserveringen', isActive: true },
@@ -167,9 +200,25 @@ export default function ReservationsPage() {
 			sidebarItems={sidebarItems}
 			onLogout={handleLogout}
 		>
-			<h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
-				Reserveringen in {yearmonth}
-			</h2>
+
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={handlePreviousMonth}
+          className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors"
+        >
+          ← Vorige maand
+        </button>
+        <button
+          onClick={handleNextMonth}
+          className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors"
+        >
+          Volgende maand →
+        </button>
+      </div>
+
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+        Reserveringen in {formatMonthYear(yearmonth)}
+      </h2>
 
 			{error && (
 				<div className="mb-6 p-4 rounded-md bg-red-50 dark:bg-red-900 text-red-800 dark:text-red-200">
@@ -180,7 +229,7 @@ export default function ReservationsPage() {
 			{reservations.length === 0 ? (
 				<div className="text-center py-12">
 					<p className="text-gray-600 dark:text-gray-300">
-						Geen reserveringen gevonden voor {yearmonth}
+						Geen reserveringen gevonden voor {formatMonthYear(yearmonth)}
 					</p>
 				</div>
 			) : (
