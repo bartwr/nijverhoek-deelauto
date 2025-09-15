@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { connectToDatabase } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { cookies } from 'next/headers'
-import { Reservation, User } from '@/types/models'
+import { Reservation, User, PriceScheme } from '@/types/models'
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
 	try {
@@ -79,10 +79,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 			.sort({ reservation_start: 1 })
 			.toArray()
 
-		// Combine reservations with user data
+		// Get price schemes for all reservations
+		const priceSchemeIds = [...new Set(reservations.map(r => r.price_scheme_id))]
+		const priceSchemes = await db.collection<PriceScheme>('PriceSchemes')
+			.find({ _id: { $in: priceSchemeIds } })
+			.toArray()
+		
+		const priceSchemeMap = new Map(priceSchemes.map(ps => [ps._id!.toString(), ps]))
+
+		// Combine reservations with user data and price scheme data
 		const reservationsWithUsers = reservations.map(reservation => ({
 			...reservation,
-			user: user
+			user: user,
+			priceScheme: priceSchemeMap.get(reservation.price_scheme_id.toString())
 		}))
 
 		return NextResponse.json({

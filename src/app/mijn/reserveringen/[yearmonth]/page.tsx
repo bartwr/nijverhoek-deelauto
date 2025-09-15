@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
-import { Reservation, User } from '@/types/models'
+import { Reservation, User, PriceScheme } from '@/types/models'
+import { displayTimeCostsCalculation, displayKilometerCostsCalculation, calculateKilometerCosts, calculateTimeCosts } from '@/lib/reservation-utils'
 
 interface ReservationWithUser extends Reservation {
 	user?: User
+	priceScheme?: PriceScheme
 }
 
 interface AuthUser {
@@ -166,7 +168,7 @@ export default function ReservationsPage() {
 			onLogout={handleLogout}
 		>
 			<h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
-				Reserveringen van {yearmonth}
+				Reserveringen in {yearmonth}
 			</h2>
 
 			{error && (
@@ -188,11 +190,52 @@ export default function ReservationsPage() {
 							<div className="flex justify-between items-start mb-4">
 								<div className="flex-1">
 									<h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
-										Rit van {formatTime(reservation.effective_start)} tot {formatTime(reservation.effective_end)} op {formatDate(reservation.reservation_start)}
+										Rit van {formatTime(new Date(reservation.reservation_start))} tot {formatTime(new Date(reservation.effective_end > reservation.reservation_end ? reservation.effective_end : reservation.reservation_end))} op {formatDate(new Date(reservation.reservation_start))}
 									</h3>
 									<div className="space-y-1 text-gray-600 dark:text-gray-300">
-										<p>Huur: {formatCurrency(reservation.total_costs - (reservation.kilometers_driven * 0.25))}</p>
-										<p>Kilometers: {reservation.kilometers_driven} km = {formatCurrency(reservation.kilometers_driven * 0.25)}</p>
+                    {reservation.remarks && <p><i>{reservation.remarks}</i></p>}
+										{reservation.priceScheme ? (
+											<>
+												<p>Huur: {formatCurrency(calculateTimeCosts(
+													new Date(reservation.reservation_start),
+													new Date(reservation.reservation_end),
+													new Date(reservation.effective_start),
+													new Date(reservation.effective_end),
+													reservation.priceScheme
+												))}<br />
+                        <details className="text-xs text-gray-500 dark:text-gray-400">
+                          <summary className="cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
+                            Bekijk berekening
+                          </summary>
+                          <div className="mt-1 pl-2 border-l-2 border-gray-300 dark:border-gray-600">
+                            {displayTimeCostsCalculation(
+                              new Date(reservation.reservation_start),
+                              new Date(reservation.reservation_end),
+                              new Date(reservation.effective_start),
+                              new Date(reservation.effective_end),
+                              reservation.priceScheme
+                            )}
+                          </div>
+                        </details>
+                        </p>
+												<p>Kilometers: {reservation.kilometers_driven} km = {formatCurrency(calculateKilometerCosts(
+													reservation.kilometers_driven,
+													reservation.priceScheme
+												))}<br />
+                        <details className="text-xs text-gray-500 dark:text-gray-400">
+                          <summary className="cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
+                            Bekijk berekening
+                          </summary>
+                          <div className="mt-1 pl-2 border-l-2 border-gray-300 dark:border-gray-600">
+                            {displayKilometerCostsCalculation(
+                              reservation.kilometers_driven,
+                              reservation.priceScheme
+                            )}
+                          </div>
+                        </details>
+                        </p>
+											</>
+										) : <></>}
 										<p className="font-semibold">Totaal: {formatCurrency(reservation.total_costs)}</p>
 									</div>
 								</div>

@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { cookies } from 'next/headers'
 import { ProcessedReservationData, User, Reservation, PriceScheme } from '@/types/models'
+import { calculateTotalCosts } from '@/lib/reservation-utils'
 
 export async function POST(
 	request: NextRequest
@@ -99,35 +100,15 @@ export async function POST(
 				processedUsers.set(reservationData.name_user, userId)
 			}
 
-      const startReservationCost = (
-        effectiveStart < reservedStart ? 0 : (effectiveStart.getTime() - reservedStart.getTime())
-        * defaultPriceScheme.costs_per_unused_reserved_hour_start_trip
-        / 3600000
-      );
-
-      const effectiveReservationCost = (
-        (
-          effectiveEnd.getTime() - effectiveStart.getTime()
-        )
-        * defaultPriceScheme.costs_per_effective_hour
-        / 3600000
-      );
-
-      const endReservationCost = effectiveEnd > reservedEnd ? 0 : (
-        (reservedEnd.getTime() - effectiveEnd.getTime())
-        * defaultPriceScheme.costs_per_unused_reserved_hour_end_trip
-        / 3600000
-      );
-
-      // Calculate total costs
-      const totalCosts = parseFloat(
-        ((reservationData.kilometers_driven * defaultPriceScheme.costs_per_kilometer)
-        + startReservationCost
-        + effectiveReservationCost
-        + endReservationCost).toFixed(2)
-      );
-
-      console.log('Total costs:', totalCosts)
+			// Calculate total costs using utility function
+			const totalCosts = calculateTotalCosts(
+				reservationData.kilometers_driven,
+				reservedStart,
+				reservedEnd,
+				effectiveStart,
+				effectiveEnd,
+				defaultPriceScheme
+			)
 
 			// Create reservation
 			const reservation: Omit<Reservation, '_id'> = {
