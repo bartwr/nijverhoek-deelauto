@@ -15,6 +15,15 @@ export default function MijnStartPage() {
 	const [isLoading, setIsLoading] = useState(true)
 	const router = useRouter()
 
+	// Function to get previous month in YYYY-MM format
+	const getPreviousMonth = () => {
+		const now = new Date()
+		const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+		const year = previousMonth.getFullYear()
+		const month = String(previousMonth.getMonth() + 1).padStart(2, '0')
+		return `${year}-${month}`
+	}
+
 	useEffect(() => {
 		checkAuthStatus()
 	}, [])
@@ -69,7 +78,7 @@ export default function MijnStartPage() {
 
 	const sidebarItems = [
 		{ href: '/mijn', label: 'Start', isActive: true },
-		{ href: '/mijn/reserveringen/2025-09', label: 'Reserveringen', isActive: false },
+		{ href: `/mijn/reserveringen/${getPreviousMonth()}`, label: 'Reserveringen', isActive: false },
 		{ href: '/mijn/betalingen', label: 'Betalingen', isActive: false }
 	]
 
@@ -94,7 +103,7 @@ export default function MijnStartPage() {
 						Bekijk je reserveringen per maand en markeer ze als zakelijk of privé.
 					</p>
 					<a
-						href="/mijn/reserveringen/2025-09"
+						href={`/mijn/reserveringen/${getPreviousMonth()}`}
 						className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
 					>
 						Bekijk reserveringen

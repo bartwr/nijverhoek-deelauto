@@ -173,6 +173,12 @@ export default function ReservationsPage() {
 		router.push(`/mijn/reserveringen/${nextMonth}`)
 	}
 
+	const isCurrentMonth = () => {
+		const now = new Date()
+		const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+		return yearmonth === currentYearMonth
+	}
+
 	const sidebarItems = [
 		{ href: '/mijn', label: 'Start', isActive: false },
 		{ href: `/mijn/reserveringen/${yearmonth}`, label: 'Reserveringen', isActive: true },
@@ -208,12 +214,14 @@ export default function ReservationsPage() {
         >
           ← Vorige maand
         </button>
-        <button
-          onClick={handleNextMonth}
-          className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors"
-        >
-          Volgende maand →
-        </button>
+        {!isCurrentMonth() && (
+          <button
+            onClick={handleNextMonth}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors"
+          >
+            Volgende maand →
+          </button>
+        )}
       </div>
 
       <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
