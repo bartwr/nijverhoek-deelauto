@@ -32,6 +32,7 @@ export interface Reservation {
 	price_scheme_id: ObjectId
 	total_costs: number
 	remarks?: string
+	is_business_transaction?: boolean
 }
 
 // Types for XLSX data processing
