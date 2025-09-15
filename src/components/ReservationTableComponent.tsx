@@ -5,7 +5,7 @@ import { ProcessedReservationData } from '@/types/models'
 
 interface ReservationTableComponentProps {
 	data: ProcessedReservationData[]
-	onSave: () => void
+	onSave: (editedData: ProcessedReservationData[]) => void
 	onBack: () => void
 	isLoading: boolean
 }
@@ -89,7 +89,7 @@ export default function ReservationTableComponent({
 
 	const handleSave = () => {
 		if (validateAllRows()) {
-			onSave()
+			onSave(editableData)
 		}
 	}
 

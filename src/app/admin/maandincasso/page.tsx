@@ -57,7 +57,7 @@ export default function MaandincassoPage() {
 		setCurrentStep('review')
 	}
 
-	const handleSaveReservations = async () => {
+	const handleSaveReservations = async (editedData: ProcessedReservationData[]) => {
 		setIsLoading(true)
 		setMessage('')
 
@@ -67,7 +67,7 @@ export default function MaandincassoPage() {
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify({ reservations: reservationData })
+				body: JSON.stringify({ reservations: editedData })
 			})
 
 			const data = await response.json()
