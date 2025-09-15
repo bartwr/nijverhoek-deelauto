@@ -41,7 +41,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
 			amount_in_euros: roundedAmount,
 			is_business_transaction: body.is_business_transaction,
 			send_at: new Date(body.send_at),
-			paid_at: undefined
+			paid_at: undefined,
+			reservations_paid: body.reservations_paid || []
 		}
 
 		const result = await db.collection('Payments').insertOne(payment)

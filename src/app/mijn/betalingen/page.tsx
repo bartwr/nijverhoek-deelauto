@@ -3,21 +3,36 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
+import { Payment } from '@/types/payment'
+import { Reservation, User, PriceScheme } from '@/types/models'
 
-interface User {
+interface AuthUser {
 	email: string
 	expiresAt: number
 }
 
+interface OutstandingReservations {
+	[yearMonth: string]: Array<Reservation & { user: User; priceScheme?: PriceScheme }>
+}
+
 export default function BetalingenPage() {
 	const [isLoggedIn, setIsLoggedIn] = useState(false)
-	const [user, setUser] = useState<User | null>(null)
+	const [user, setUser] = useState<AuthUser | null>(null)
 	const [isLoading, setIsLoading] = useState(true)
+	const [completedPayments, setCompletedPayments] = useState<Payment[]>([])
+	const [outstandingReservations, setOutstandingReservations] = useState<OutstandingReservations>({})
+	const [isLoadingPayments, setIsLoadingPayments] = useState(true)
 	const router = useRouter()
 
 	useEffect(() => {
 		checkAuthStatus()
 	}, [])
+
+	useEffect(() => {
+		if (isLoggedIn) {
+			fetchPaymentData()
+		}
+	}, [isLoggedIn])
 
 	const checkAuthStatus = async () => {
 		try {
@@ -41,6 +56,32 @@ export default function BetalingenPage() {
 		}
 	}
 
+	const fetchPaymentData = async () => {
+		try {
+			setIsLoadingPayments(true)
+			
+			// Fetch completed payments and outstanding reservations in parallel
+			const [paymentsResponse, reservationsResponse] = await Promise.all([
+				fetch('/api/user/payments'),
+				fetch('/api/user/outstanding-reservations')
+			])
+
+			if (paymentsResponse.ok) {
+				const paymentsData = await paymentsResponse.json()
+				setCompletedPayments(paymentsData.data || [])
+			}
+
+			if (reservationsResponse.ok) {
+				const reservationsData = await reservationsResponse.json()
+				setOutstandingReservations(reservationsData.data || {})
+			}
+		} catch (error) {
+			console.error('Error fetching payment data:', error)
+		} finally {
+			setIsLoadingPayments(false)
+		}
+	}
+
 	const handleLogout = async () => {
 		try {
 			await fetch('/api/user/logout', { method: 'POST' })
@@ -50,6 +91,60 @@ export default function BetalingenPage() {
 		} catch (error) {
 			console.error('Error logging out:', error)
 		}
+	}
+
+	const handlePayNow = async (yearMonth: string, reservations: Array<Reservation & { user: User; priceScheme?: PriceScheme }>) => {
+		// Calculate total amount for this group
+		const totalAmount = reservations.reduce((sum, reservation) => sum + reservation.total_costs, 0)
+		const isBusiness = reservations.some(r => r.is_business_transaction)
+		const transactionType = isBusiness ? 'zakelijke' : 'privé'
+		
+		// Create payment request
+		const paymentData = {
+			title: `Deelauto Nijverhoek - ${yearMonth} - ${transactionType} - ${reservations[0]?.user?.name || 'Onbekend'}`,
+			description: `Betaling voor ${reservations.length} ${transactionType} reservering(en) in ${yearMonth}`,
+			amount_in_euros: totalAmount,
+			is_business_transaction: isBusiness,
+			send_at: new Date().toISOString(),
+			reservations_paid: reservations.map(r => r._id?.toString()).filter(Boolean)
+		}
+
+		try {
+			const response = await fetch('/api/payments', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(paymentData)
+			})
+
+			if (response.ok) {
+				// Refresh the data
+				await fetchPaymentData()
+				alert('Betaling aangemaakt! Je kunt nu betalen.')
+			} else {
+				const errorData = await response.json()
+				alert(`Fout bij aanmaken betaling: ${errorData.error}`)
+			}
+		} catch (error) {
+			console.error('Error creating payment:', error)
+			alert('Er is een fout opgetreden bij het aanmaken van de betaling.')
+		}
+	}
+
+	const formatAmount = (amount: number) => {
+		return `€${amount.toFixed(2)}`
+	}
+
+	const formatDate = (date: Date | string) => {
+		const d = new Date(date)
+		return d.toLocaleDateString('nl-NL', {
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit'
+		})
 	}
 
 	if (isLoading) {
@@ -82,11 +177,119 @@ export default function BetalingenPage() {
 			<h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
 				Betalingen
 			</h2>
-			<div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-				<p className="text-gray-600 dark:text-gray-300">
-					Deze pagina is nog in ontwikkeling. Hier kun je straks je betalingsgeschiedenis bekijken.
-				</p>
-			</div>
+
+			{isLoadingPayments ? (
+				<div className="flex items-center justify-center py-8">
+					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+					<span className="ml-2 text-gray-600 dark:text-gray-300">Betalingen laden...</span>
+				</div>
+			) : (
+				<div className="space-y-8">
+					{/* Openstaande acties */}
+					<div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+						<h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+							Openstaande acties
+						</h3>
+						
+						{Object.keys(outstandingReservations).length === 0 ? (
+							<p className="text-gray-600 dark:text-gray-300">
+								Geen openstaande betalingen gevonden.
+							</p>
+						) : (
+							<div className="space-y-4">
+								{Object.entries(outstandingReservations).map(([groupKey, reservations]) => {
+									const totalAmount = reservations.reduce((sum, reservation) => sum + reservation.total_costs, 0)
+									const isBusiness = reservations.some(r => r.is_business_transaction)
+									
+									// Extract year-month from group key (format: YYYY-MM-business or YYYY-MM-personal)
+									const yearMonth = groupKey.split('-').slice(0, 2).join('-')
+									
+									return (
+										<div key={groupKey} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+											<div className="flex justify-between items-start mb-2">
+												<div>
+													<h4 className="font-medium text-gray-900 dark:text-gray-100">
+														Deelauto Nijverhoek - {yearMonth} - {reservations[0]?.user?.name || 'Onbekend'}
+													</h4>
+													<p className="text-sm text-gray-600 dark:text-gray-300">
+														{isBusiness ? 'Zakelijk' : 'Privé'}
+													</p>
+												</div>
+												<div className="text-right">
+													<p className="font-semibold text-gray-900 dark:text-gray-100">
+														{formatAmount(totalAmount)}
+													</p>
+													<p className="text-sm text-gray-600 dark:text-gray-300">
+														{reservations.length} reservering(en)
+													</p>
+												</div>
+											</div>
+											<button
+												onClick={() => handlePayNow(yearMonth, reservations)}
+												className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+											>
+												Betaal nu
+											</button>
+										</div>
+									)
+								})}
+							</div>
+						)}
+					</div>
+
+					{/* Voltooide betalingen */}
+					<div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+						<h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+							Voltooide betalingen
+						</h3>
+						
+						{completedPayments.length === 0 ? (
+							<p className="text-gray-600 dark:text-gray-300">
+								Geen voltooide betalingen gevonden.
+							</p>
+						) : (
+							<div className="overflow-x-auto">
+								<table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+									<thead className="bg-gray-50 dark:bg-gray-700">
+										<tr>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+												Title
+											</th>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+												Bedrag
+											</th>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+												Zakelijk?
+											</th>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+												Betaald op
+											</th>
+										</tr>
+									</thead>
+									<tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+										{completedPayments.map((payment) => (
+											<tr key={payment._id}>
+												<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+													{payment.title}
+												</td>
+												<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+													{formatAmount(payment.amount_in_euros)}
+												</td>
+												<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+													{payment.is_business_transaction ? 'Ja' : 'Nee'}
+												</td>
+												<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+													{payment.paid_at ? formatDate(payment.paid_at) : '-'}
+												</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+						)}
+					</div>
+				</div>
+			)}
 		</AdminLayout>
 	)
 }

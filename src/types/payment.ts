@@ -7,6 +7,7 @@ export interface Payment {
 	is_business_transaction: boolean
 	send_at: Date
 	paid_at?: Date
+	reservations_paid?: string[] // Array of reservation IDs that are included in this payment
 }
 
 export interface CreatePaymentRequest {
@@ -15,6 +16,7 @@ export interface CreatePaymentRequest {
 	amount_in_euros: number
 	is_business_transaction: boolean
 	send_at: Date
+	reservations_paid?: string[]
 }
 
 export interface UpdatePaymentPaidRequest {
