@@ -1,8 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { MongoClient } from 'mongodb'
 
 export async function GET(): Promise<NextResponse> {
-	const results: any = {
+	const results: {
+		environment: {
+			nodeEnv: string | undefined;
+			hasMongoUri: boolean;
+			hasMongoDb: boolean;
+			mongoDbName: string | undefined;
+		};
+		tests: Array<{
+			name: string;
+			status: string;
+			details?: unknown;
+			error?: string;
+			errorName?: string;
+		}>;
+	} = {
 		environment: {
 			nodeEnv: process.env.NODE_ENV,
 			hasMongoUri: !!process.env.MONGODB_URI,

@@ -1,11 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { MongoClient } from 'mongodb'
 
 export async function GET(): Promise<NextResponse> {
 	const originalUri = process.env.MONGODB_URI!
 	const dbName = process.env.MONGODB_DB!
 	
-	const results: any = {
+	const results: {
+		originalUri: string;
+		tests: Array<{
+			name: string;
+			status: string;
+			connectTime?: string;
+			error?: string;
+			reason?: string;
+			uri?: string;
+		}>;
+	} = {
 		originalUri: originalUri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'),
 		tests: []
 	}

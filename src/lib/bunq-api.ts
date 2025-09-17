@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server'
 
 export interface BunqPaymentRequest {
 	amount_inquired: {
@@ -31,6 +30,16 @@ export interface BunqApiContext {
 	sessionToken: string
 	userId: number
 	monetaryAccountId: number
+}
+
+interface BunqApiResponse {
+	Response: Array<{
+		Id?: { id: number };
+		Token?: { token: string };
+		RequestInquiry?: BunqPaymentResponse;
+		UserPerson?: { id: number };
+		MonetaryAccountBank?: { id: number };
+	}>;
 }
 
 class BunqApiClient {
@@ -140,7 +149,7 @@ class BunqApiClient {
 	/**
 	 * Create installation
 	 */
-	private async createInstallation(): Promise<any> {
+	private async createInstallation(): Promise<BunqApiResponse> {
 		const clientPublicKey = process.env.BUNQ_CLIENT_PUBLIC_KEY || ''
 		
 		if (!clientPublicKey) {
@@ -186,7 +195,7 @@ class BunqApiClient {
 	/**
 	 * Register device
 	 */
-	private async registerDevice(installationToken: string): Promise<any> {
+	private async registerDevice(installationToken: string): Promise<BunqApiResponse> {
 		const requestBody = {
 			description: 'Deelauto Nijverhoek Payment System',
 			secret: this.apiKey
@@ -228,7 +237,7 @@ class BunqApiClient {
 	/**
 	 * Start session
 	 */
-	private async startSession(installationToken: string): Promise<any> {
+	private async startSession(installationToken: string): Promise<BunqApiResponse> {
 		const requestBody = {
 			secret: this.apiKey
 		}
@@ -268,7 +277,7 @@ class BunqApiClient {
 	/**
 	 * Get user information
 	 */
-	private async getUserInfo(sessionToken: string): Promise<any> {
+	private async getUserInfo(sessionToken: string): Promise<{ id: number }> {
 		const response = await fetch(`${this.baseUrl}/v1/user`, {
 			method: 'GET',
 			headers: {
@@ -284,8 +293,8 @@ class BunqApiClient {
 			throw new Error(`Get user info failed: ${response.statusText}`)
 		}
 
-		const data = await response.json()
-		return data.Response[0].UserPerson
+		const data = await response.json() as BunqApiResponse
+		return data.Response[0].UserPerson!
 	}
 
 	/**
@@ -307,9 +316,9 @@ class BunqApiClient {
 			throw new Error(`Get monetary account failed: ${response.statusText}`)
 		}
 
-		const data = await response.json()
+		const data = await response.json() as BunqApiResponse
 		// Return the first monetary account ID
-		return data.Response[0].MonetaryAccountBank.id
+		return data.Response[0].MonetaryAccountBank!.id
 	}
 
 	/**
@@ -347,7 +356,7 @@ class BunqApiClient {
 			throw new Error(`Payment request creation failed: ${response.statusText} - ${errorText}`)
 		}
 
-		const data = await response.json()
+		const data = await response.json() as BunqApiResponse
 		console.log('Bunq payment request response:', JSON.stringify(data, null, 2))
 		
 		// Check if we have the expected response structure with ID
@@ -392,7 +401,7 @@ class BunqApiClient {
 			throw new Error(`Get request inquiry details failed: ${response.statusText} - ${errorText}`)
 		}
 
-		const data = await response.json()
+		const data = await response.json() as BunqApiResponse
 		console.log('Request inquiry details:', JSON.stringify(data, null, 2))
 		
 		if (!data.Response || !data.Response[0] || !data.Response[0].RequestInquiry) {
@@ -401,6 +410,21 @@ class BunqApiClient {
 		}
 		
 		return data.Response[0].RequestInquiry
+	}
+
+	/**
+	 * Check the status of a payment request by ID
+	 */
+	async checkPaymentRequestStatus(requestId: number): Promise<BunqPaymentResponse> {
+		if (!this.context) {
+			await this.initializeContext()
+		}
+
+		if (!this.context) {
+			throw new Error('Failed to initialize bunq context')
+		}
+
+		return await this.getRequestInquiryDetails(requestId)
 	}
 
 	/**
@@ -453,5 +477,35 @@ export async function createBunqPaymentRequest(
 	} catch (error) {
 		console.error('Error creating bunq payment request:', error)
 		throw new Error('Failed to create bunq payment request')
+	}
+}
+
+/**
+ * Helper function to check bunq payment status and return normalized status
+ */
+export async function checkBunqPaymentStatus(requestId: number): Promise<string> {
+	try {
+		const response = await bunqApi.checkPaymentRequestStatus(requestId)
+		console.log('Bunq payment status check response:', JSON.stringify(response, null, 2))
+		
+		// Normalize bunq status to our internal status format
+		const bunqStatus = response.status?.toUpperCase()
+		
+		switch (bunqStatus) {
+			case 'PENDING':
+				return 'PENDING'
+			case 'ACCEPTED':
+			case 'SETTLED':
+				return 'ACCEPTED'
+			case 'REJECTED':
+			case 'CANCELLED':
+				return 'REJECTED'
+			default:
+				console.warn('Unknown bunq status:', bunqStatus)
+				return bunqStatus || 'UNKNOWN'
+		}
+	} catch (error) {
+		console.error('Error checking bunq payment status:', error)
+		throw new Error('Failed to check bunq payment status')
 	}
 }

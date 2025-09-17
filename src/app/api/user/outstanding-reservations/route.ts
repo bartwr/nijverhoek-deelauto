@@ -88,7 +88,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 		const priceSchemeMap = new Map(priceSchemes.map(ps => [ps._id!.toString(), ps]))
 
 		// Group reservations by year-month and business status
-		const groupedReservations: { [key: string]: any[] } = {}
+		const groupedReservations: { [key: string]: unknown[] } = {}
 		
 		outstandingReservations.forEach(reservation => {
 			const yearMonth = `${reservation.reservation_start.getFullYear()}-${String(reservation.reservation_start.getMonth() + 1).padStart(2, '0')}`

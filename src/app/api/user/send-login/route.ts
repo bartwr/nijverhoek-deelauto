@@ -7,7 +7,7 @@ interface SendLoginRequest {
 }
 
 interface LoginToken {
-	_id: any
+	_id: unknown
 	email: string
 	token: string
 	expiresAt: Date

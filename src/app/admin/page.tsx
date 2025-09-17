@@ -15,6 +15,8 @@ export default function AdminPage() {
 	const [email, setEmail] = useState('')
 	const [isLoading, setIsLoading] = useState(false)
 	const [message, setMessage] = useState('')
+	const [syncMessage, setSyncMessage] = useState('')
+	const [isSyncing, setIsSyncing] = useState(false)
 	const router = useRouter()
 
 	useEffect(() => {
@@ -79,6 +81,33 @@ export default function AdminPage() {
 		}
 	}
 
+	const handleSyncBunqStatuses = async () => {
+		setIsSyncing(true)
+		setSyncMessage('')
+		
+		try {
+			const response = await fetch('/api/payments/sync-bunq-status', {
+				method: 'GET'
+			})
+			
+			const data = await response.json()
+			
+			if (data.success) {
+				setSyncMessage(`Success: ${data.message}`)
+				if (data.errors && data.errors.length > 0) {
+					setSyncMessage(prev => prev + ` (${data.errors.length} errors occurred)`)
+				}
+			} else {
+				setSyncMessage(`Error: ${data.error || 'Failed to sync bunq statuses'}`)
+			}
+		} catch (error) {
+			console.error('Error syncing bunq statuses:', error)
+			setSyncMessage('Error: Failed to sync bunq statuses')
+		} finally {
+			setIsSyncing(false)
+		}
+	}
+
 	if (isLoggedIn && user) {
 		const sidebarItems = [
 			{ href: '/admin', label: 'Dashboard', isActive: true },
@@ -94,9 +123,32 @@ export default function AdminPage() {
 				<h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
 					Hoi {user.email}
 				</h2>
-				<p className="text-gray-600 dark:text-gray-300">
+				<p className="text-gray-600 dark:text-gray-300 mb-6">
 					Welkom bij het Deelauto Nijverhoek admin dashboard
 				</p>
+				
+				<div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+					<h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+						Bunq Status Synchronisatie
+					</h3>
+					<p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+						Synchroniseer de bunq payment statussen met de database. Dit controleert alle openstaande betalingen bij bunq en werkt hun status bij.
+					</p>
+					
+					<button
+						onClick={handleSyncBunqStatuses}
+						disabled={isSyncing}
+						className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2 px-4 rounded-md transition-colors cursor-pointer"
+					>
+						{isSyncing ? 'Synchroniseren...' : 'Synchroniseer Bunq Statussen'}
+					</button>
+					
+					{syncMessage && (
+						<div className={`mt-4 text-sm ${syncMessage.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
+							{syncMessage}
+						</div>
+					)}
+				</div>
 			</AdminLayout>
 		)
 	}

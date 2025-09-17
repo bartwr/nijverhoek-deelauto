@@ -1,4 +1,7 @@
 import { CreatePaymentRequest } from '@/types/payment'
+import { connectToDatabase } from '@/lib/mongodb'
+import { checkBunqPaymentStatus } from '@/lib/bunq-api'
+import { ObjectId } from 'mongodb'
 
 export function validateCreatePaymentRequest(body: CreatePaymentRequest): { isValid: boolean; errors: string[] } {
 	const errors: string[] = []
@@ -67,5 +70,100 @@ export function sanitizePaymentData(payment: CreatePaymentRequest) {
 		amount_in_euros: formatAmount(payment.amount_in_euros),
 		is_business_transaction: payment.is_business_transaction,
 		send_at: new Date(payment.send_at)
+	}
+}
+
+/**
+ * Update bunq status for a specific payment
+ */
+export async function updatePaymentBunqStatus(paymentId: string): Promise<{ success: boolean; status?: string; error?: string }> {
+	try {
+		const { db } = await connectToDatabase()
+		
+		// Get the payment
+		const payment = await db.collection('Payments').findOne({ _id: new ObjectId(paymentId) })
+		
+		if (!payment) {
+			return { success: false, error: 'Payment not found' }
+		}
+		
+		if (!payment.bunq_request_id) {
+			return { success: false, error: 'Payment has no bunq request ID' }
+		}
+		
+		// Check bunq status
+		const newStatus = await checkBunqPaymentStatus(payment.bunq_request_id)
+		
+		// Update the payment if status changed
+		if (payment.bunq_status !== newStatus) {
+			const updateData: { bunq_status: string; paid_at?: Date } = {
+				bunq_status: newStatus
+			}
+			
+			// If payment is accepted and not already marked as paid, mark it as paid
+			if (newStatus === 'ACCEPTED' && !payment.paid_at) {
+				updateData.paid_at = new Date()
+			}
+			
+			await db.collection('Payments').updateOne(
+				{ _id: new ObjectId(paymentId) },
+				{ $set: updateData }
+			)
+			
+			console.log(`Updated payment ${paymentId} bunq status from ${payment.bunq_status} to ${newStatus}`)
+		}
+		
+		return { success: true, status: newStatus }
+	} catch (error) {
+		console.error('Error updating payment bunq status:', error)
+		return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+	}
+}
+
+/**
+ * Update bunq statuses for all payments with bunq request IDs that are not yet paid
+ */
+export async function syncAllBunqStatuses(): Promise<{ success: boolean; updated: number; errors: string[] }> {
+	try {
+		const { db } = await connectToDatabase()
+		
+		// Get all payments with bunq request IDs that are not marked as paid or have PENDING status
+		const paymentsToCheck = await db.collection('Payments').find({
+			bunq_request_id: { $exists: true, $ne: null },
+			$or: [
+				{ paid_at: { $exists: false } },
+				{ paid_at: null },
+				{ bunq_status: 'PENDING' }
+			]
+		}).toArray()
+		
+		console.log(`Found ${paymentsToCheck.length} payments to check for bunq status updates`)
+		
+		let updatedCount = 0
+		const errors: string[] = []
+		
+		for (const payment of paymentsToCheck) {
+			try {
+				const result = await updatePaymentBunqStatus(payment._id.toString())
+				if (result.success) {
+					updatedCount++
+				} else if (result.error) {
+					errors.push(`Payment ${payment._id}: ${result.error}`)
+				}
+				
+				// Add a small delay to avoid overwhelming the bunq API
+				await new Promise(resolve => setTimeout(resolve, 100))
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+				errors.push(`Payment ${payment._id}: ${errorMessage}`)
+			}
+		}
+		
+		console.log(`Bunq status sync completed: ${updatedCount} payments updated, ${errors.length} errors`)
+		
+		return { success: true, updated: updatedCount, errors }
+	} catch (error) {
+		console.error('Error syncing bunq statuses:', error)
+		return { success: false, updated: 0, errors: [error instanceof Error ? error.message : 'Unknown error'] }
 	}
 }

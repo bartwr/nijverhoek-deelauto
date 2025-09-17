@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb'
 import { cookies } from 'next/headers'
 import { Payment } from '@/types/payment'
 import { User } from '@/types/models'
+import { syncAllBunqStatuses } from '@/lib/payment-utils'
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
 	try {
@@ -44,6 +45,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 				{ status: 404 }
 			)
 		}
+
+		// Sync bunq statuses before fetching payments (don't wait for completion)
+		syncAllBunqStatuses().catch(error => {
+			console.warn('Background bunq status sync failed:', error)
+		})
 
 		// Fetch completed payments (where paid_at is not null)
 		const completedPayments = await db.collection('Payments')

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { connectToDatabase } from '@/lib/mongodb'
 import { CreatePaymentRequest, PaymentResponse, Payment } from '@/types/payment'
 import { createBunqPaymentRequest } from '@/lib/bunq-api'
+import { syncAllBunqStatuses } from '@/lib/payment-utils'
 
 export async function POST(request: NextRequest): Promise<NextResponse<PaymentResponse>> {
 	try {
@@ -123,6 +124,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
 
 export async function GET(): Promise<NextResponse<PaymentResponse>> {
 	try {
+		// Sync bunq statuses before fetching payments (don't wait for completion)
+		syncAllBunqStatuses().catch(error => {
+			console.warn('Background bunq status sync failed:', error)
+		})
+
 		const { db } = await connectToDatabase()
 		const payments = await db.collection('Payments').find({}).sort({ datetime_created: -1 }).toArray()
 

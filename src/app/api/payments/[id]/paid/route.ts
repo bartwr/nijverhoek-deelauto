@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/lib/mongodb'
 import { UpdatePaymentPaidRequest, PaymentResponse } from '@/types/payment'
 import { ObjectId } from 'mongodb'
 import { Payment } from '@/types/payment'
+import { updatePaymentBunqStatus } from '@/lib/payment-utils'
 
 export async function PATCH(
 	request: NextRequest,
@@ -66,6 +67,13 @@ export async function PATCH(
 			)
 		}
 
+		// Try to update bunq status as well (don't fail if this fails)
+		try {
+			await updatePaymentBunqStatus(id)
+		} catch (error) {
+			console.warn('Failed to update bunq status after marking payment as paid:', error)
+		}
+
 		// Fetch the updated payment to return
 		const updatedPayment = await db.collection('Payments').findOne({ _id: new ObjectId(id) })
 
@@ -120,6 +128,27 @@ export async function GET(
 				},
 				{ status: 404 }
 			)
+		}
+
+		// Try to update bunq status if payment has bunq request ID and is not yet paid
+		if (payment.bunq_request_id && !payment.paid_at) {
+			try {
+				await updatePaymentBunqStatus(id)
+				// Fetch updated payment
+				const updatedPayment = await db.collection('Payments').findOne({ _id: new ObjectId(id) })
+				if (updatedPayment) {
+					return NextResponse.json(
+						{
+							success: true,
+							data: updatedPayment as unknown as Payment,
+							message: 'Payment retrieved successfully'
+						},
+						{ status: 200 }
+					)
+				}
+			} catch (error) {
+				console.warn('Failed to update bunq status when retrieving payment:', error)
+			}
 		}
 
 		return NextResponse.json(
