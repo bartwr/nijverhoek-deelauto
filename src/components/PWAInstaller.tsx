@@ -62,7 +62,7 @@ export function PWAInstaller() {
 		<div className="fixed bottom-4 right-4 z-50">
 			<button
 				onClick={handleInstallClick}
-				className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-colors"
+				className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-colors cursor-pointer"
 			>
 				<svg
 					className="w-5 h-5"

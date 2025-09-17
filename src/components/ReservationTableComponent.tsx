@@ -120,14 +120,14 @@ export default function ReservationTableComponent({
 					<button
 						onClick={onBack}
 						disabled={isLoading}
-						className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+						className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
 					>
 						Terug naar upload
 					</button>
 					<button
 						onClick={handleSave}
 						disabled={isLoading}
-						className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+						className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
 					>
 						{isLoading ? 'Opslaan...' : 'Akkoord - Opslaan'}
 					</button>
@@ -179,7 +179,7 @@ export default function ReservationTableComponent({
 								<td className="px-3 py-4 whitespace-nowrap">
 									<button
 										onClick={() => removeRow(index)}
-										className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
+										className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200 cursor-pointer"
 										title="Rij verwijderen"
 									>
 										<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

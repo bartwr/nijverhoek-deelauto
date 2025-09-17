@@ -202,7 +202,7 @@ export default function PaymentTester() {
 				<button
 					onClick={createPayment}
 					disabled={loading}
-					className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+					className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
 				>
 					{loading ? 'Creating...' : 'Create Payment'}
 				</button>
@@ -226,7 +226,7 @@ export default function PaymentTester() {
 					<button
 						onClick={fetchPayments}
 						disabled={loading}
-						className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 disabled:opacity-50"
+						className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 disabled:opacity-50 cursor-pointer"
 					>
 						{loading ? 'Loading...' : 'Refresh'}
 					</button>
@@ -257,7 +257,7 @@ export default function PaymentTester() {
 										<button
 											onClick={() => payment._id && markAsPaid(payment._id)}
 											disabled={loading}
-											className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 disabled:opacity-50"
+											className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 disabled:opacity-50 cursor-pointer"
 										>
 											Mark as Paid
 										</button>

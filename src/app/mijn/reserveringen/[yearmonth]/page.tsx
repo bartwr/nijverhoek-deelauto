@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { Reservation, User, PriceScheme } from '@/types/models'
 import { displayTimeCostsCalculation, displayKilometerCostsCalculation, calculateKilometerCosts, calculateTimeCosts } from '@/lib/reservation-utils'
+import { getUserSidebarItems } from '@/lib/sidebar-utils'
 
 interface ReservationWithUser extends Reservation {
 	user?: User
@@ -179,11 +180,7 @@ export default function ReservationsPage() {
 		return yearmonth === currentYearMonth
 	}
 
-	const sidebarItems = [
-		{ href: '/mijn', label: 'Start', isActive: false },
-		{ href: `/mijn/reserveringen/${yearmonth}`, label: 'Reserveringen', isActive: true },
-		{ href: '/mijn/betalingen', label: 'Betalingen', isActive: false }
-	]
+	const sidebarItems = getUserSidebarItems(`/mijn/reserveringen/${yearmonth}`, yearmonth)
 
 	if (isLoading) {
 		return (
@@ -210,23 +207,30 @@ export default function ReservationsPage() {
       <div className="flex gap-2 mb-6">
         <button
           onClick={handlePreviousMonth}
-          className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors"
+          className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors cursor-pointer"
         >
           ← Vorige maand
         </button>
         {!isCurrentMonth() && (
           <button
             onClick={handleNextMonth}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors cursor-pointer"
           >
             Volgende maand →
           </button>
         )}
       </div>
 
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
         Reserveringen in {formatMonthYear(yearmonth)}
       </h2>
+
+      <div
+        className="mb-6 p-4 rounded-md bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200 transition-colors"
+        tabIndex={0}
+      >
+        <span className="font-medium">Tip:</span> geef optioneel per rit aan of het een privé-rit of zakelijke rit was. Standaard is elke rit privé, tenzij anders ingesteld.
+      </div>
 
 			{error && (
 				<div className="mb-6 p-4 rounded-md bg-red-50 dark:bg-red-900 text-red-800 dark:text-red-200">
@@ -235,9 +239,9 @@ export default function ReservationsPage() {
 			)}
 
 			{reservations.length === 0 ? (
-				<div className="text-center py-12">
+				<div className="text-left py-12">
 					<p className="text-gray-600 dark:text-gray-300">
-						Geen reserveringen gevonden voor {formatMonthYear(yearmonth)}
+						Geen reserveringen gevonden voor {formatMonthYear(yearmonth)}. De reserveringen worden pas rond de eerste week van de opvolgende maand hier getoond. Je reserveringen staan wel altijd actueel in de Deelauto app en op mijn.deelauto.nl
 					</p>
 				</div>
 			) : (
@@ -296,14 +300,14 @@ export default function ReservationsPage() {
 										<p className="font-semibold">Totaal: {formatCurrency(reservation.total_costs)}</p>
 									</div>
 								</div>
-								<button
-									onClick={() => toggleBusinessStatus(reservation._id!.toString(), reservation.is_business_transaction || false)}
-									className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-										reservation.is_business_transaction
-											? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
-											: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
-									}`}
-								>
+							<button
+								onClick={() => toggleBusinessStatus(reservation._id!.toString(), reservation.is_business_transaction || false)}
+								className={`px-4 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+									reservation.is_business_transaction
+										? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
+										: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+								}`}
+							>
 									{reservation.is_business_transaction ? 'Zakelijk' : 'Prive'}
 								</button>
 							</div>

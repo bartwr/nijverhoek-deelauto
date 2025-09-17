@@ -18,7 +18,7 @@ export function PWAInstallGuide() {
 		<>
 			<button
 				onClick={() => setIsOpen(true)}
-				className="fixed bottom-4 left-4 z-50 bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition-colors"
+				className="fixed bottom-4 left-4 z-50 bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition-colors cursor-pointer"
 				title="Hoe installeer ik de app?"
 			>
 				<svg
@@ -44,10 +44,10 @@ export function PWAInstallGuide() {
 								<h2 className="text-xl font-bold text-gray-900">
 									App installeren op je telefoon
 								</h2>
-								<button
-									onClick={() => setIsOpen(false)}
-									className="text-gray-400 hover:text-gray-600"
-								>
+							<button
+								onClick={() => setIsOpen(false)}
+								className="text-gray-400 hover:text-gray-600 cursor-pointer"
+							>
 									<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
 									</svg>
@@ -82,10 +82,10 @@ export function PWAInstallGuide() {
 								</div>
 							</div>
 
-							<button
-								onClick={() => setIsOpen(false)}
-								className="w-full mt-6 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-							>
+						<button
+							onClick={() => setIsOpen(false)}
+							className="w-full mt-6 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg font-medium transition-colors cursor-pointer"
+						>
 								Begrepen
 							</button>
 						</div>
