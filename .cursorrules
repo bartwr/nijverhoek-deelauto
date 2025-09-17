@@ -126,6 +126,7 @@ This comprehensive guide outlines best practices, conventions, and standards for
     - Ensure color contrast ratios meet accessibility standards for readability.
     - Maintain consistent spacing values to establish visual harmony.
     - Define CSS variables for theme colors and spacing to support easy theming and maintainability.
+    - Always give clickable buttons a hover pointer cursor using the `cursor-pointer` class.
 
     State Management
     Local State

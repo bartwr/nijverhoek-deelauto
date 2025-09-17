@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { Payment } from '@/types/payment'
 import { Reservation, User, PriceScheme } from '@/types/models'
+import { getUserSidebarItems } from '@/lib/sidebar-utils'
 
 interface AuthUser {
 	email: string
@@ -98,15 +99,19 @@ export default function BetalingenPage() {
 		const totalAmount = reservations.reduce((sum, reservation) => sum + reservation.total_costs, 0)
 		const isBusiness = reservations.some(r => r.is_business_transaction)
 		const transactionType = isBusiness ? 'zakelijke' : 'privé'
+		const userName = reservations[0]?.user?.name || 'Onbekend'
+		const userEmail = reservations[0]?.user?.email_address
 		
 		// Create payment request
 		const paymentData = {
-			title: `Deelauto Nijverhoek - ${yearMonth} - ${transactionType} - ${reservations[0]?.user?.name || 'Onbekend'}`,
+			title: `Deelauto Nijverhoek - ${yearMonth} - ${transactionType} - ${userName}`,
 			description: `Betaling voor ${reservations.length} ${transactionType} reservering(en) in ${yearMonth}`,
 			amount_in_euros: totalAmount,
 			is_business_transaction: isBusiness,
 			send_at: new Date().toISOString(),
-			reservations_paid: reservations.map(r => r._id?.toString()).filter(Boolean)
+			reservations_paid: reservations.map(r => r._id?.toString()).filter(Boolean),
+			user_email: userEmail,
+			create_bunq_request: true
 		}
 
 		try {
@@ -119,9 +124,20 @@ export default function BetalingenPage() {
 			})
 
 			if (response.ok) {
+				const result = await response.json()
+				const payment = result.data
+				
 				// Refresh the data
 				await fetchPaymentData()
-				alert('Betaling aangemaakt! Je kunt nu betalen.')
+				
+				// If bunq payment URL was created, redirect to it
+				if (payment.bunq_payment_url) {
+					// Open bunq payment link in new tab
+					window.open(payment.bunq_payment_url, '_blank')
+					alert('Betaling aangemaakt! Je wordt doorgestuurd naar de betalingspagina.')
+				} else {
+					alert('Betaling aangemaakt! Er kon geen automatische betalingslink worden gemaakt.')
+				}
 			} else {
 				const errorData = await response.json()
 				alert(`Fout bij aanmaken betaling: ${errorData.error}`)
@@ -162,11 +178,15 @@ export default function BetalingenPage() {
 		return null // Will redirect to login
 	}
 
-	const sidebarItems = [
-		{ href: '/mijn', label: 'Start', isActive: false },
-		{ href: '/mijn/reserveringen/2025-09', label: 'Reserveringen', isActive: false },
-		{ href: '/mijn/betalingen', label: 'Betalingen', isActive: true }
-	]
+	const sidebarItems = getUserSidebarItems('/mijn/betalingen')
+
+  function getPreviousMonth() {
+    const now = new Date()
+    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const year = previousMonth.getFullYear()
+    const month = String(previousMonth.getMonth() + 1).padStart(2, '0')
+    return `${year}-${month}`
+  }
 
 	return (
 		<AdminLayout
@@ -190,6 +210,17 @@ export default function BetalingenPage() {
 						<h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
 							Openstaande acties
 						</h3>
+
+						<div
+							className="mb-6 p-4 rounded-md bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors"
+							onClick={() => {
+								window.location.href = '/mijn/reserveringen/' + getPreviousMonth()
+							}}
+							role="button"
+							tabIndex={0}
+						>
+							<span className="font-medium">Tip:</span> klik <u>hier</u> om per reservering op te geven of het een privé-rit of zakelijke rit was, en kom daarna terug op deze pagina om zowel zakelijk als privé te betalen.
+						</div>
 						
 						{Object.keys(outstandingReservations).length === 0 ? (
 							<p className="text-gray-600 dark:text-gray-300">
@@ -226,7 +257,7 @@ export default function BetalingenPage() {
 											</div>
 											<button
 												onClick={() => handlePayNow(yearMonth, reservations)}
-												className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+												className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors cursor-pointer"
 											>
 												Betaal nu
 											</button>
@@ -262,6 +293,9 @@ export default function BetalingenPage() {
 												Zakelijk?
 											</th>
 											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+												Bunq Status
+											</th>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
 												Betaald op
 											</th>
 										</tr>
@@ -277,6 +311,18 @@ export default function BetalingenPage() {
 												</td>
 												<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
 													{payment.is_business_transaction ? 'Ja' : 'Nee'}
+												</td>
+												<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+													{payment.bunq_status ? (
+														<span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+															payment.bunq_status === 'PENDING' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+															payment.bunq_status === 'ACCEPTED' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+															payment.bunq_status === 'REJECTED' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+															'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+														}`}>
+															{payment.bunq_status}
+														</span>
+													) : '-'}
 												</td>
 												<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
 													{payment.paid_at ? formatDate(payment.paid_at) : '-'}

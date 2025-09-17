@@ -38,7 +38,7 @@ export default function UserLoginPage() {
 			const data = await response.json()
 
 			if (response.ok) {
-				setMessage('Check your email for a login link!')
+				setMessage('Controleer je mailbox voor een login-link')
 				setEmail('')
 			} else {
 				setMessage(data.error || 'Failed to send login email')
@@ -66,7 +66,7 @@ export default function UserLoginPage() {
 			const data = await response.json()
 
 			if (response.ok) {
-				setMessage('Login successful! Redirecting...')
+				setMessage('Succesvol ingelogd! Dashboard wordt geladen...')
 				router.push('/mijn')
 			} else {
 				setMessage(data.error || 'Invalid login token')

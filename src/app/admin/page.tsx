@@ -56,7 +56,7 @@ export default function AdminPage() {
 			const data = await response.json()
 
 			if (response.ok) {
-				setMessage('Check your email for a login link!')
+				setMessage('Controleer je mailbox voor een login-link')
 				setEmail('')
 			} else {
 				setMessage(data.error || 'Failed to send login email')

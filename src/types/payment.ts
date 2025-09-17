@@ -8,6 +8,9 @@ export interface Payment {
 	send_at: Date
 	paid_at?: Date
 	reservations_paid?: string[] // Array of reservation IDs that are included in this payment
+	bunq_request_id?: number // bunq payment request ID
+	bunq_payment_url?: string // bunq.me payment link
+	bunq_status?: string // Status of the bunq payment request
 }
 
 export interface CreatePaymentRequest {
@@ -17,6 +20,8 @@ export interface CreatePaymentRequest {
 	is_business_transaction: boolean
 	send_at: Date
 	reservations_paid?: string[]
+	user_email?: string // Email for bunq payment request
+	create_bunq_request?: boolean // Whether to create bunq payment request
 }
 
 export interface UpdatePaymentPaidRequest {
