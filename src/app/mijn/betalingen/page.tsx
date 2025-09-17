@@ -23,6 +23,7 @@ export default function BetalingenPage() {
 	const [completedPayments, setCompletedPayments] = useState<Payment[]>([])
 	const [outstandingReservations, setOutstandingReservations] = useState<OutstandingReservations>({})
 	const [isLoadingPayments, setIsLoadingPayments] = useState(true)
+	const [paymentCooldowns, setPaymentCooldowns] = useState<{ [key: string]: number }>({})
 	const router = useRouter()
 
 	useEffect(() => {
@@ -34,6 +35,29 @@ export default function BetalingenPage() {
 			fetchPaymentData()
 		}
 	}, [isLoggedIn])
+
+	// Update cooldown timers every second
+	useEffect(() => {
+		const interval = setInterval(() => {
+			setPaymentCooldowns(prev => {
+				const now = Date.now()
+				const updated = { ...prev }
+				let hasChanges = false
+				
+				Object.keys(updated).forEach(key => {
+					const timeDiff = now - updated[key]
+					if (timeDiff >= 10 * 1000) { // 10 seconds
+						delete updated[key]
+						hasChanges = true
+					}
+				})
+				
+				return hasChanges ? updated : prev
+			})
+		}, 1000)
+		
+		return () => clearInterval(interval)
+	}, [])
 
 	const checkAuthStatus = async () => {
 		try {
@@ -94,10 +118,41 @@ export default function BetalingenPage() {
 		}
 	}
 
+	const getPaymentCooldownInfo = (groupKey: string) => {
+		const lastClickTime = paymentCooldowns[groupKey]
+		if (!lastClickTime) return { isOnCooldown: false, remainingSeconds: 0 }
+		
+		const now = Date.now()
+		const timeDiff = now - lastClickTime
+		const cooldownDuration = 10 * 1000 // 10 seconds
+		
+		if (timeDiff < cooldownDuration) {
+			const remainingSeconds = Math.ceil((cooldownDuration - timeDiff) / 1000)
+			return { isOnCooldown: true, remainingSeconds }
+		}
+		
+		return { isOnCooldown: false, remainingSeconds: 0 }
+	}
+
 	const handlePayNow = async (yearMonth: string, reservations: Array<Reservation & { user: User; priceScheme?: PriceScheme }>) => {
+		const isBusiness = reservations.some(r => r.is_business_transaction)
+		const groupKey = `${yearMonth}-${isBusiness ? 'business' : 'personal'}`
+		
+		// Check if this payment group is on cooldown
+		const { isOnCooldown, remainingSeconds } = getPaymentCooldownInfo(groupKey)
+		if (isOnCooldown) {
+			alert(`Je kunt pas over ${remainingSeconds} seconden opnieuw een betaling aanmaken.`)
+			return
+		}
+		
+		// Set cooldown for this payment group
+		setPaymentCooldowns(prev => ({
+			...prev,
+			[groupKey]: Date.now()
+		}))
+		
 		// Calculate total amount for this group
 		const totalAmount = reservations.reduce((sum, reservation) => sum + reservation.total_costs, 0)
-		const isBusiness = reservations.some(r => r.is_business_transaction)
 		const transactionType = isBusiness ? 'zakelijke' : 'privé'
 		const userName = reservations[0]?.user?.name || 'Onbekend'
 		const userEmail = reservations[0]?.user?.email_address
@@ -235,6 +290,9 @@ export default function BetalingenPage() {
 									// Extract year-month from group key (format: YYYY-MM-business or YYYY-MM-personal)
 									const yearMonth = groupKey.split('-').slice(0, 2).join('-')
 									
+									// Check cooldown status for this payment group
+									const { isOnCooldown, remainingSeconds } = getPaymentCooldownInfo(groupKey)
+									
 									return (
 										<div key={groupKey} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
 											<div className="flex justify-between items-start mb-2">
@@ -257,9 +315,14 @@ export default function BetalingenPage() {
 											</div>
 											<button
 												onClick={() => handlePayNow(yearMonth, reservations)}
-												className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors cursor-pointer"
+												disabled={isOnCooldown}
+												className={`w-full font-medium py-2 px-4 rounded-md transition-colors ${
+													isOnCooldown 
+														? 'bg-gray-400 dark:bg-gray-600 text-gray-200 cursor-not-allowed' 
+														: 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
+												}`}
 											>
-												Betaal nu
+												{isOnCooldown ? `Betaal nu... (${remainingSeconds}s)` : 'Betaal nu'}
 											</button>
 										</div>
 									)
