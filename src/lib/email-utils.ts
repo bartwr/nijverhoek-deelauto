@@ -1,3 +1,5 @@
+import nodemailer from 'nodemailer'
+
 interface EmailOptions {
 	to: string
 	subject: string
@@ -6,26 +8,31 @@ interface EmailOptions {
 }
 
 /**
- * Send an email using the configured email service
- * Currently logs to console for development
- * In production, integrate with services like SendGrid, Mailgun, or AWS SES
+ * Send an email using TransIP SMTP server
  */
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
 	try {
-		// For development, just log the email
-		console.log('=== EMAIL SENT ===')
-		console.log('To:', options.to)
-		console.log('Subject:', options.subject)
-		console.log('HTML:', options.html)
-		console.log('Text:', options.text)
-		console.log('==================')
+		// Create transporter with TransIP SMTP settings
+		const transporter = nodemailer.createTransport({
+			host: 'smtp.transip.email',
+			port: 465,
+			secure: true, // true for 465, false for other ports
+			auth: {
+				user: process.env.EMAIL_USER || 'mail@nijverhoek.nl',
+				pass: process.env.EMAIL_PASSWORD || 'PASSWD'
+			}
+		})
 
-		// TODO: Implement actual email sending
-		// Example with SendGrid:
-		// const sgMail = require('@sendgrid/mail')
-		// sgMail.setApiKey(process.env.SENDGRID_API_KEY)
-		// await sgMail.send(options)
+		// Send email
+		const info = await transporter.sendMail({
+			from: `"Deelauto Nijverhoek" <${process.env.EMAIL_USER || 'mail@nijverhoek.nl'}>`,
+			to: options.to,
+			subject: options.subject,
+			text: options.text,
+			html: options.html
+		})
 
+		console.log('Email sent successfully:', info.messageId)
 		return true
 	} catch (error) {
 		console.error('Failed to send email:', error)
