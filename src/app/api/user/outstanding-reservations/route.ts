@@ -74,7 +74,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 			.find({
 				user_id: user._id,
 				reservation_start: { $lt: currentMonthStart },
-        bunq_status: { $ne: 'ACCEPTED' },
+        $and: [
+          { paid_at: { $eq: null } },
+				  { bunq_status: { $nin: ['ACCEPTED', 'PAID'] } },
+        ],
 				_id: { $nin: Array.from(paidReservationIds).map(id => new ObjectId(id)) }
 			})
 			.sort({ reservation_start: 1 })
