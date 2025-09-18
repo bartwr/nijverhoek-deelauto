@@ -27,12 +27,13 @@ function UserLoginContent() {
 		setMessage('')
 
 		try {
+			const redirectUrl = searchParams.get('redirect')
 			const response = await fetch('/api/user/send-login', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify({ email })
+				body: JSON.stringify({ email, redirect: redirectUrl })
 			})
 
 			const data = await response.json()
@@ -67,7 +68,8 @@ function UserLoginContent() {
 
 			if (response.ok) {
 				setMessage('Succesvol ingelogd! Dashboard wordt geladen...')
-				router.push('/mijn')
+				const redirectUrl = searchParams.get('redirect') || '/mijn'
+				router.push(redirectUrl)
 			} else {
 				setMessage(data.error || 'Invalid login token')
 			}

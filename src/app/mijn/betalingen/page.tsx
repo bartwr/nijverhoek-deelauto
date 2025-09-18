@@ -96,14 +96,14 @@ export default function BetalingenPage() {
 					setIsLoggedIn(true)
 					setUser(data.user)
 				} else {
-					router.push('/mijn/login')
+					router.push(`/mijn/login?redirect=${encodeURIComponent(window.location.pathname)}`)
 				}
 			} else {
-				router.push('/mijn/login')
+				router.push(`/mijn/login?redirect=${encodeURIComponent(window.location.pathname)}`)
 			}
 		} catch (error) {
 			console.error('Error checking auth status:', error)
-			router.push('/mijn/login')
+			router.push(`/mijn/login?redirect=${encodeURIComponent(window.location.pathname)}`)
 		} finally {
 			setIsLoading(false)
 		}

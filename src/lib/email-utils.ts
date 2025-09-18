@@ -49,42 +49,28 @@ export function generateLoginEmail(loginUrl: string): { html: string; text: stri
 		<html>
 		<head>
 			<meta charset="utf-8">
-			<title>Admin Login - Deelauto Nijverhoek</title>
+			<title>Login bij Deelauto Nijverhoek</title>
 		</head>
 		<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
 			<div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-				<h1 style="color: #2563eb;">Deelauto Nijverhoek Admin</h1>
-				<p>You requested access to the admin panel.</p>
-				<p>Click the button below to log in:</p>
+				<h1 style="color: #2563eb;">Deelauto Nijverhoek</h1>
+				<p>Klik op de volgende link om in te loggen:</p>
 				<div style="text-align: center; margin: 30px 0;">
-					<a href="${loginUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Log In to Admin Panel</a>
+					<a href="${loginUrl}" style="background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Log in</a>
 				</div>
-				<p><strong>This link will expire in 15 minutes.</strong></p>
-				<p>If you didn't request this email, you can safely ignore it.</p>
-				<hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
-				<p style="font-size: 12px; color: #6b7280;">
-					This is an automated message from Deelauto Nijverhoek. Please do not reply to this email.
-				</p>
+				<p><strong>De link is 15 minuten geldig.</strong></p>
 			</div>
 		</body>
 		</html>
 	`
 
 	const text = `
-Deelauto Nijverhoek Admin
+Deelauto Nijverhoek
 
-You requested access to the admin panel.
-
-Click the link below to log in:
+Klik op de volgende link om in te loggen:
 ${loginUrl}
 
-This link will expire in 15 minutes.
-
-If you didn't request this email, you can safely ignore it.
-
----
-This is an automated message from Deelauto Nijverhoek. Please do not reply to this email.
-	`
+De link is 15 minuten geldig.`
 
 	return { html, text }
 }

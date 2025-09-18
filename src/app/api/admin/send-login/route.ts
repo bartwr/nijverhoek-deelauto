@@ -5,6 +5,7 @@ import crypto from 'crypto'
 
 interface SendLoginRequest {
 	email: string
+	redirect?: string
 }
 
 interface LoginToken {
@@ -21,7 +22,7 @@ export async function POST(
 ): Promise<NextResponse> {
 	try {
 		const body: SendLoginRequest = await request.json()
-		const { email } = body
+		const { email, redirect } = body
 
 		if (!email) {
 			return NextResponse.json(
@@ -75,7 +76,10 @@ export async function POST(
 		}
 
 		// Generate the login URL
-		const loginUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/login?token=${token}`
+		const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+		const loginUrl = redirect 
+			? `${baseUrl}/admin/login?token=${token}&redirect=${encodeURIComponent(redirect)}`
+			: `${baseUrl}/admin/login?token=${token}`
 		
 		// Import and use the email utility
 		const { sendEmail, generateLoginEmail } = await import('@/lib/email-utils')

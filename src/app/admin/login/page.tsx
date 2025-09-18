@@ -20,18 +20,19 @@ function AdminLoginContent() {
 			})
 
 			if (response.ok) {
-				// Token is valid, redirect to admin dashboard
-				router.push('/admin')
+				// Token is valid, redirect to admin dashboard or intended page
+				const redirectUrl = searchParams.get('redirect') || '/admin'
+				router.push(redirectUrl)
 			} else {
 				const data = await response.json()
 				setError(data.error || 'Invalid or expired login token')
 			}
-		} catch (error) {
+		} catch {
 			setError('An error occurred while validating the token')
 		} finally {
 			setIsValidating(false)
 		}
-	}, [router])
+	}, [router, searchParams])
 
 	useEffect(() => {
 		const token = searchParams.get('token')
