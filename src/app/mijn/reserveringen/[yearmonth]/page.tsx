@@ -17,6 +17,12 @@ interface AuthUser {
 	expiresAt: number
 }
 
+interface PaymentInfo {
+	reservations_paid?: string[]
+	bunq_status?: string
+	paid_at?: Date
+}
+
 export default function ReservationsPage() {
 	const params = useParams()
 	const router = useRouter()
@@ -26,6 +32,8 @@ export default function ReservationsPage() {
 	const [error, setError] = useState('')
 	const [isLoggedIn, setIsLoggedIn] = useState(false)
 	const [user, setUser] = useState<AuthUser | null>(null)
+	const [payments, setPayments] = useState<PaymentInfo[]>([])
+	const [isLoadingPayments, setIsLoadingPayments] = useState(true)
 
 	useEffect(() => {
 		checkAuthStatus()
@@ -34,6 +42,7 @@ export default function ReservationsPage() {
 	useEffect(() => {
 		if (isLoggedIn) {
 			fetchReservations()
+			fetchPayments()
 		}
 	}, [yearmonth, isLoggedIn])
 
@@ -76,6 +85,54 @@ export default function ReservationsPage() {
 		} finally {
 			setIsLoading(false)
 		}
+	}
+
+	const fetchPayments = async () => {
+		try {
+			setIsLoadingPayments(true)
+			
+			const response = await fetch('/api/user/payments')
+			const data = await response.json()
+
+			if (data.success) {
+				setPayments(data.data || [])
+			} else {
+				console.error('Failed to fetch payments:', data.error)
+			}
+		} catch (error) {
+			console.error('Error fetching payments:', error)
+		} finally {
+			setIsLoadingPayments(false)
+		}
+	}
+
+	const isReservationUnpaid = (reservation: ReservationWithUser) => {
+		// A reservation is unpaid if:
+		// 1. The reservation_start date is before the start of the current month
+		// 2. Its ID is not in the reservations_paid of any Payment that has bunq_status "ACCEPTED" or "PAID"
+		
+		const now = new Date()
+		const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+		
+		// Check if reservation_start is before current month
+		const reservationStart = new Date(reservation.reservation_start)
+		if (reservationStart >= currentMonthStart) {
+			return false
+		}
+		
+		// Check if this reservation ID is in any paid payment
+		const reservationId = reservation._id?.toString()
+		if (!reservationId) return false
+		
+		const isPaid = payments.some(payment => {
+			const hasValidStatus = payment.bunq_status === 'ACCEPTED' || payment.bunq_status === 'PAID'
+			const hasValidPaidAt = payment.paid_at !== null && payment.paid_at !== undefined
+			const includesReservation = payment.reservations_paid?.includes(reservationId)
+			
+			return (hasValidStatus || hasValidPaidAt) && includesReservation
+		})
+		
+		return !isPaid
 	}
 
 	const toggleBusinessStatus = async (reservationId: string, currentStatus: boolean) => {
@@ -331,17 +388,30 @@ export default function ReservationsPage() {
 										</p>
 										<p className="text-sm text-gray-500 dark:text-gray-400">Totaal</p>
 									</div>
-									<button
-										onClick={() => toggleBusinessStatus(reservation._id!.toString(), reservation.is_business_transaction || false)}
-										className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer flex items-center space-x-1 ${
-											reservation.is_business_transaction
-												? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-900/50'
-												: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-900/50'
-										}`}
-									>
-										<span>{reservation.is_business_transaction ? '💼' : '🏠'}</span>
-										<span>{reservation.is_business_transaction ? 'Zakelijk' : 'Privé'}</span>
-									</button>
+									<div className="w-full sm:w-auto flex flex-row sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2">
+										<button
+											onClick={() => toggleBusinessStatus(reservation._id!.toString(), reservation.is_business_transaction || false)}
+											className={`w-1/2 sm:w-auto px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer flex items-center justify-center space-x-1 ${
+												reservation.is_business_transaction
+													? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-900/50'
+													: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-900/50'
+											}`}
+										>
+											<span>{reservation.is_business_transaction ? '💼' : '🏠'}</span>
+											<span>{reservation.is_business_transaction ? 'Zakelijk' : 'Privé'}</span>
+										</button>
+										{!isLoadingPayments && isReservationUnpaid(reservation) && (
+											<button
+												onClick={() => router.push('/mijn/betalingen')}
+												className="w-1/2 sm:w-auto px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer flex items-center justify-center space-x-1 bg-[#ea5c33] hover:bg-[#ea5c33]/90 text-white shadow-lg hover:shadow-xl"
+											>
+												<svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+													<path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zM14 6a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h8zM6 8a2 2 0 012 2v2H6V8z" />
+												</svg>
+												<span>Naar betalen</span>
+											</button>
+										)}
+									</div>
 								</div>
 							</div>
 						</div>
