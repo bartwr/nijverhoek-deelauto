@@ -59,6 +59,34 @@ export default function BetalingenPage() {
 		return () => clearInterval(interval)
 	}, [])
 
+	// Sync bunq status every 60 seconds when there are outstanding reservations
+	useEffect(() => {
+		const hasOutstandingReservations = Object.keys(outstandingReservations).length > 0
+		
+		if (!hasOutstandingReservations || !isLoggedIn) {
+			return
+		}
+
+		const syncBunqStatus = async () => {
+			try {
+				const response = await fetch('/api/payments/sync-bunq-status')
+				if (response.ok) {
+					const result = await response.json()
+					if (result.success && result.updated_count > 0) {
+						// Refresh payment data if any payments were updated
+						await fetchPaymentData()
+					}
+				}
+			} catch (error) {
+				console.error('Error syncing bunq status:', error)
+			}
+		}
+
+		const interval = setInterval(syncBunqStatus, 60 * 1000) // 30 seconds
+		
+		return () => clearInterval(interval)
+	}, [outstandingReservations, isLoggedIn])
+
 	const checkAuthStatus = async () => {
 		try {
 			const response = await fetch('/api/user/check-auth')
@@ -82,6 +110,7 @@ export default function BetalingenPage() {
 	}
 
 	const fetchPaymentData = async () => {
+    console.log('fetchPaymentData')
 		try {
 			setIsLoadingPayments(true)
 			
