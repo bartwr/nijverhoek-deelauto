@@ -74,14 +74,14 @@ npm start
 - Hoofdtitel: "Een auto in de buurt, voor de buurt"
 - Ondertitel: "Je betaalt alleen voor wat je rijdt"
 - Animaties afbeelding van Giphy
-- Feature highlights (Elektrisch rijden, 350 km actieradius, Gedeelde kosten)
+- Feature highlights (Elektrisch rijden, 400 km actieradius, Gedeelde kosten)
 
 ### 3. Uitleg Sectie
 - Centrale boodschap in een aantrekkelijke kaart
 - Visuele elementen en iconen
 
 ### 4. FAQ Sectie
-- **Om welke auto gaat het?** - Kia e-Niro met 350 km actieradius
+- **Om welke auto gaat het?** - Kia e-Niro met 400 km actieradius
 - **Wie is de initiatiefnemer?** - Drie huishoudens in de Nijverhoek
 - **Hoe kan ik gebruik maken van de auto?** - Testperiode en account aanmaken
 - **Wat kost het?** - Jaarlijkse kosten en rijkosten

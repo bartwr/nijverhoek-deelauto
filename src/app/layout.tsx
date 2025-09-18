@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Deelauto Nijverhoek - Gedeelde auto in de buurt",
-  description: "Een auto in de buurt, voor de buurt. Je betaalt alleen voor wat je rijdt. Kia e-Niro met 350 km actieradius beschikbaar in de Nijverhoek.",
+  description: "Een auto in de buurt, voor de buurt. Je betaalt alleen voor wat je rijdt. Kia e-Niro met 400 km actieradius beschikbaar in de Nijverhoek.",
   keywords: ["deelauto", "gedeelde auto", "Nijverhoek", "elektrische auto", "car sharing"],
   authors: [{ name: "Deelauto Nijverhoek" }],
   manifest: "/manifest.json",

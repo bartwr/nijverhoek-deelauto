@@ -11,7 +11,7 @@ interface FAQItem {
 const faqData: FAQItem[] = [
 	{
 		question: 'Om welke auto gaat het?',
-		answer: 'Het is een Kia e-Niro met 350 km actieradius',
+		answer: 'Het is een Kia e-Niro met 400 km actieradius',
 		icon: '🚗'
 	},
 	{
