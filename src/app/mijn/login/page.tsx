@@ -138,7 +138,7 @@ function UserLoginContent() {
 
 export default function UserLoginPage() {
 	return (
-		<Suspense fallback={<div>Loading...</div>}>
+		<Suspense fallback={<div>Laden...</div>}>
 			<UserLoginContent />
 		</Suspense>
 	)

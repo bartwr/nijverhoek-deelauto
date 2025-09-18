@@ -228,7 +228,7 @@ export default function PaymentTester() {
 						disabled={loading}
 						className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 disabled:opacity-50 cursor-pointer"
 					>
-						{loading ? 'Loading...' : 'Refresh'}
+						{loading ? 'Laden...' : 'Refresh'}
 					</button>
 				</div>
 				

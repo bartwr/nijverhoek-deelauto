@@ -252,7 +252,7 @@ export default function BetalingenPage() {
 			<div className="min-h-screen bg-gradient-to-br from-[#ea5c33]/5 via-white to-[#ea5c33]/5 dark:from-[#ea5c33]/10 dark:via-gray-900 dark:to-[#ea5c33]/10 flex items-center justify-center">
 				<div className="text-center">
 					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ea5c33] mx-auto mb-4"></div>
-					<p className="text-gray-600 dark:text-gray-300">Loading...</p>
+					<p className="text-gray-600 dark:text-gray-300">Laden...</p>
 				</div>
 			</div>
 		)
@@ -301,19 +301,14 @@ export default function BetalingenPage() {
 						</div>
 
 						<div
-							className="mb-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors border border-blue-200 dark:border-blue-800"
-							onClick={() => {
-								window.location.href = '/mijn/reserveringen/' + getPreviousMonth()
-							}}
-							role="button"
-							tabIndex={0}
+							className="mb-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 transition-colors border border-blue-200 dark:border-blue-800"
 						>
 							<div className="flex items-start space-x-2">
 								<svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
 									<path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
 								</svg>
 								<div>
-									<span className="font-medium">Tip:</span> klik <u>hier</u> om per reservering op te geven of het een privé-rit of zakelijke rit was, en kom daarna terug op deze pagina om zowel zakelijk als privé te betalen.
+									<span className="font-medium">Tip:</span> klik op <b>Details</b> om per reservering op te geven of het een privé-rit of zakelijke rit was, en kom daarna terug op deze pagina om zowel zakelijk als privé te betalen.
 								</div>
 							</div>
 						</div>
@@ -361,29 +356,41 @@ export default function BetalingenPage() {
 													</p>
 												</div>
 											</div>
-											<button
-												onClick={() => handlePayNow(yearMonth, reservations)}
-												disabled={isOnCooldown}
-												className={`w-full font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
-													isOnCooldown 
-														? 'bg-gray-400 dark:bg-gray-600 text-gray-200 cursor-not-allowed' 
-														: 'bg-[#ea5c33] hover:bg-[#ea5c33]/90 text-white cursor-pointer shadow-lg hover:shadow-xl'
-												}`}
-											>
-												{isOnCooldown ? (
-													<>
-														<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-200"></div>
-														<span>Betaal nu... ({remainingSeconds}s)</span>
-													</>
-												) : (
-													<>
-														<svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-															<path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zM14 6a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h8zM6 8a2 2 0 012 2v2H6V8z" />
-														</svg>
-														<span>Betaal nu</span>
-													</>
-												)}
-											</button>
+                      <div className="flex justify-between items-center gap-4 ">
+                        <button
+                          onClick={() => router.push('/mijn/reserveringen/' + yearMonth)}
+                          className="w-full flex-1 font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white cursor-pointer shadow-lg hover:shadow-xl"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                          <span>Details</span>
+                        </button>
+                        <button
+                          onClick={() => handlePayNow(yearMonth, reservations)}
+                          disabled={isOnCooldown}
+                          className={`w-full flex-2 font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
+                            isOnCooldown 
+                              ? 'bg-gray-400 dark:bg-gray-600 text-gray-200 cursor-not-allowed' 
+                              : 'bg-[#ea5c33] hover:bg-[#ea5c33]/90 text-white cursor-pointer shadow-lg hover:shadow-xl'
+                          }`}
+                        >
+                          {isOnCooldown ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-200"></div>
+                              <span>
+                                Betaal<span className="hidden sm:inline"> nu</span>... ({remainingSeconds}s)</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zM14 6a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h8zM6 8a2 2 0 012 2v2H6V8z" />
+                              </svg>
+                              <span>Betaal<span className="hidden sm:inline"> nu</span></span>
+                            </>
+                          )}
+                        </button>
+                      </div>
 										</div>
 									)
 								})}
