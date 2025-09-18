@@ -34,6 +34,7 @@ export default function ReservationsPage() {
 	const [user, setUser] = useState<AuthUser | null>(null)
 	const [payments, setPayments] = useState<PaymentInfo[]>([])
 	const [isLoadingPayments, setIsLoadingPayments] = useState(true)
+	const [updatingReservations, setUpdatingReservations] = useState<Set<string>>(new Set())
 
 	useEffect(() => {
 		checkAuthStatus()
@@ -136,32 +137,60 @@ export default function ReservationsPage() {
 	}
 
 	const toggleBusinessStatus = async (reservationId: string, currentStatus: boolean) => {
+		const newStatus = !currentStatus
+		
+		// Optimistically update the UI immediately
+		setReservations(prev => 
+			prev.map(reservation => 
+				reservation._id?.toString() === reservationId
+					? { ...reservation, is_business_transaction: newStatus }
+					: reservation
+			)
+		)
+
+		// Add to updating set for loading indicator
+		setUpdatingReservations(prev => new Set(prev).add(reservationId))
+
 		try {
 			const response = await fetch(`/api/reservations/${reservationId}/business-status`, {
 				method: 'PATCH',
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify({ is_business_transaction: !currentStatus })
+				body: JSON.stringify({ is_business_transaction: newStatus })
 			})
 
 			const data = await response.json()
 
-			if (data.success) {
-				// Update the local state
+			if (!data.success) {
+				// Revert the optimistic update if the API call failed
 				setReservations(prev => 
 					prev.map(reservation => 
 						reservation._id?.toString() === reservationId
-							? { ...reservation, is_business_transaction: !currentStatus }
+							? { ...reservation, is_business_transaction: currentStatus }
 							: reservation
 					)
 				)
-			} else {
 				setError(data.error || 'Failed to update business status')
 			}
 		} catch (error) {
+			// Revert the optimistic update if there was an error
+			setReservations(prev => 
+				prev.map(reservation => 
+					reservation._id?.toString() === reservationId
+						? { ...reservation, is_business_transaction: currentStatus }
+						: reservation
+				)
+			)
 			setError('An error occurred while updating business status')
 			console.error('Error updating business status:', error)
+		} finally {
+			// Remove from updating set
+			setUpdatingReservations(prev => {
+				const newSet = new Set(prev)
+				newSet.delete(reservationId)
+				return newSet
+			})
 		}
 	}
 
@@ -391,14 +420,24 @@ export default function ReservationsPage() {
 									<div className="w-full sm:w-auto flex flex-row sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2">
 										<button
 											onClick={() => toggleBusinessStatus(reservation._id!.toString(), reservation.is_business_transaction || false)}
+											disabled={updatingReservations.has(reservation._id!.toString())}
 											className={`w-1/2 sm:w-auto px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer flex items-center justify-center space-x-1 ${
 												reservation.is_business_transaction
 													? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-900/50'
 													: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-900/50'
-											}`}
+											} ${updatingReservations.has(reservation._id!.toString()) ? 'opacity-75' : ''}`}
 										>
-											<span>{reservation.is_business_transaction ? '💼' : '🏠'}</span>
-											<span>{reservation.is_business_transaction ? 'Zakelijk' : 'Privé'}</span>
+											{updatingReservations.has(reservation._id!.toString()) ? (
+												<>
+													<div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+													<span>Bezig...</span>
+												</>
+											) : (
+												<>
+													<span>{reservation.is_business_transaction ? '💼' : '🏠'}</span>
+													<span>{reservation.is_business_transaction ? 'Zakelijk' : 'Privé'}</span>
+												</>
+											)}
 										</button>
 										{!isLoadingPayments && isReservationUnpaid(reservation) && (
 											<button
