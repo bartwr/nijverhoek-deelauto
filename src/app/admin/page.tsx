@@ -127,24 +127,45 @@ export default function AdminPage() {
 					Welkom bij het Deelauto Nijverhoek admin dashboard
 				</p>
 				
-				<div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-					<h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-						Bunq Status Synchronisatie
-					</h3>
-					<p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+				<div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+					<div className="flex items-center space-x-2 mb-4">
+						<svg className="w-6 h-6 text-[#ea5c33]" fill="currentColor" viewBox="0 0 20 20">
+							<path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+						</svg>
+						<h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+							Bunq Status Synchronisatie
+						</h3>
+					</div>
+					<p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
 						Synchroniseer de bunq payment statussen met de database. Dit controleert alle openstaande betalingen bij bunq en werkt hun status bij.
 					</p>
 					
 					<button
 						onClick={handleSyncBunqStatuses}
 						disabled={isSyncing}
-						className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2 px-4 rounded-md transition-colors cursor-pointer"
+						className="inline-flex items-center space-x-2 px-6 py-3 bg-[#ea5c33] hover:bg-[#ea5c33]/90 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors cursor-pointer"
 					>
-						{isSyncing ? 'Synchroniseren...' : 'Synchroniseer Bunq Statussen'}
+						{isSyncing ? (
+							<>
+								<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+								<span>Synchroniseren...</span>
+							</>
+						) : (
+							<>
+								<svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+									<path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+								</svg>
+								<span>Synchroniseer Bunq Statussen</span>
+							</>
+						)}
 					</button>
 					
 					{syncMessage && (
-						<div className={`mt-4 text-sm ${syncMessage.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
+						<div className={`mt-4 p-3 rounded-lg text-sm ${
+							syncMessage.includes('Error') 
+								? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400' 
+								: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+						}`}>
 							{syncMessage}
 						</div>
 					)}
@@ -154,50 +175,56 @@ export default function AdminPage() {
 	}
 
 	return (
-		<div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+		<div className="min-h-screen bg-gradient-to-br from-[#ea5c33]/5 via-white to-[#ea5c33]/5 dark:from-[#ea5c33]/10 dark:via-gray-900 dark:to-[#ea5c33]/10 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
 			<div className="max-w-md w-full space-y-8">
-				<div>
-					<h1 className="text-center text-3xl font-bold text-gray-900 dark:text-gray-100">
-						Deelauto Nijverhoek admin
+				<div className="text-center">
+					<h1 className="text-3xl font-bold text-gray-900 bg-gradient-to-r from-[#ea5c33] to-[#ea5c33] bg-clip-text text-transparent">
+						Deelauto Nijverhoek
 					</h1>
+					<p className="text-gray-600 dark:text-gray-300 mt-2">
+						Admin Dashboard
+					</p>
 				</div>
-				<form className="mt-8 space-y-6" onSubmit={handleLogin}>
-					<div>
-						<label htmlFor="email" className="sr-only">
-							Email address
-						</label>
-						<input
-							id="email"
-							name="email"
-							type="email"
-							autoComplete="email"
-							required
-							value={email}
-							onChange={(e) => setEmail(e.target.value)}
-							className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-							placeholder="Email address"
-						/>
-					</div>
-
-					<div>
-						<button
-							type="submit"
-							disabled={isLoading}
-							className="
-                group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors
-                cursor-pointer
-              "
-						>
-							{isLoading ? 'Mail wordt verstuurd...' : 'Log in'}
-						</button>
-					</div>
-
-					{message && (
-						<div className={`text-sm text-center ${message.includes('error') ? 'text-red-600' : 'text-green-600'}`}>
-							{message}
+				<div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
+					<form className="space-y-6" onSubmit={handleLogin}>
+						<div>
+							<label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+								Admin email adres
+							</label>
+							<input
+								id="email"
+								name="email"
+								type="email"
+								autoComplete="email"
+								required
+								value={email}
+								onChange={(e) => setEmail(e.target.value)}
+								className="appearance-none rounded-lg relative block w-full px-4 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-[#ea5c33] focus:border-[#ea5c33] transition-colors"
+								placeholder="admin@email.nl"
+							/>
 						</div>
-					)}
-				</form>
+
+						<div>
+							<button
+								type="submit"
+								disabled={isLoading}
+								className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-[#ea5c33] hover:bg-[#ea5c33]/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ea5c33] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+							>
+								{isLoading ? 'Mail wordt verstuurd...' : 'Admin Login'}
+							</button>
+						</div>
+
+						{message && (
+							<div className={`text-sm text-center p-3 rounded-lg ${
+								message.includes('error') 
+									? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400' 
+									: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+							}`}>
+								{message}
+							</div>
+						)}
+					</form>
+				</div>
 			</div>
 		</div>
 	)

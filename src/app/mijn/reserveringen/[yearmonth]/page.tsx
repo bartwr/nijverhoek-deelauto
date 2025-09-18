@@ -184,9 +184,9 @@ export default function ReservationsPage() {
 
 	if (isLoading) {
 		return (
-			<div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+			<div className="min-h-screen bg-gradient-to-br from-[#ea5c33]/5 via-white to-[#ea5c33]/5 dark:from-[#ea5c33]/10 dark:via-gray-900 dark:to-[#ea5c33]/10 flex items-center justify-center">
 				<div className="text-center">
-					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ea5c33] mx-auto mb-4"></div>
 					<p className="text-gray-600 dark:text-gray-300">Loading...</p>
 				</div>
 			</div>
@@ -204,19 +204,25 @@ export default function ReservationsPage() {
 			onLogout={handleLogout}
 		>
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex flex-wrap gap-3 mb-6">
         <button
           onClick={handlePreviousMonth}
-          className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors cursor-pointer"
+          className="inline-flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-white dark:hover:bg-gray-700 hover:border-[#ea5c33] focus:outline-none focus:ring-2 focus:ring-[#ea5c33] transition-colors cursor-pointer"
         >
-          ← Vorige maand
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+          <span>Vorige maand</span>
         </button>
         {!isCurrentMonth() && (
           <button
             onClick={handleNextMonth}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors cursor-pointer"
+            className="inline-flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-white dark:hover:bg-gray-700 hover:border-[#ea5c33] focus:outline-none focus:ring-2 focus:ring-[#ea5c33] transition-colors cursor-pointer"
           >
-            Volgende maand →
+            <span>Volgende maand</span>
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+            </svg>
           </button>
         )}
       </div>
@@ -225,16 +231,25 @@ export default function ReservationsPage() {
         Reserveringen in {formatMonthYear(yearmonth)}
       </h2>
 
-      <div
-        className="mb-6 p-4 rounded-md bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200 transition-colors"
-        tabIndex={0}
-      >
-        <span className="font-medium">Tip:</span> geef optioneel per rit aan of het een privé-rit of zakelijke rit was. Standaard is elke rit privé, tenzij anders ingesteld.
+      <div className="mb-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
+        <div className="flex items-start space-x-2">
+          <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          <div>
+            <span className="font-medium">Tip:</span> geef optioneel per rit aan of het een privé-rit of zakelijke rit was. Standaard is elke rit privé, tenzij anders ingesteld.
+          </div>
+        </div>
       </div>
 
 			{error && (
-				<div className="mb-6 p-4 rounded-md bg-red-50 dark:bg-red-900 text-red-800 dark:text-red-200">
-					{error}
+				<div className="mb-6 p-4 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800">
+					<div className="flex items-start space-x-2">
+						<svg className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+							<path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+						</svg>
+						<div>{error}</div>
+					</div>
 				</div>
 			)}
 
@@ -247,12 +262,22 @@ export default function ReservationsPage() {
 			) : (
 				<div className="space-y-6">
 					{reservations.map((reservation) => (
-						<div key={reservation._id?.toString()} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-							<div className="flex justify-between items-start mb-4">
+						<div key={reservation._id?.toString()} className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+							<div className="flex flex-col lg:flex-row lg:justify-between lg:items-start mb-4 space-y-4 lg:space-y-0">
 								<div className="flex-1">
-									<h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
-										Rit van {formatTime(new Date(reservation.reservation_start))} tot {formatTime(new Date(reservation.effective_end > reservation.reservation_end ? reservation.effective_end : reservation.reservation_end))} op {formatDate(new Date(reservation.reservation_start))}
-									</h3>
+									<div className="flex items-start space-x-3 mb-3">
+										<svg className="w-6 h-6 text-[#ea5c33] mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+											<path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+										</svg>
+										<div>
+											<h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+												{formatDate(new Date(reservation.reservation_start))}
+											</h3>
+											<p className="text-sm text-gray-600 dark:text-gray-300">
+												{formatTime(new Date(reservation.reservation_start))} - {formatTime(new Date(reservation.effective_end > reservation.reservation_end ? reservation.effective_end : reservation.reservation_end))}
+											</p>
+										</div>
+									</div>
 									<div className="space-y-1 text-gray-600 dark:text-gray-300">
                     {reservation.remarks && <p><i>{reservation.remarks}</i></p>}
 										{reservation.priceScheme ? (
@@ -297,19 +322,27 @@ export default function ReservationsPage() {
                         </p>
 											</>
 										) : <></>}
-										<p className="font-semibold">Totaal: {formatCurrency(reservation.total_costs)}</p>
 									</div>
 								</div>
-							<button
-								onClick={() => toggleBusinessStatus(reservation._id!.toString(), reservation.is_business_transaction || false)}
-								className={`px-4 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-									reservation.is_business_transaction
-										? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
-										: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
-								}`}
-							>
-									{reservation.is_business_transaction ? 'Zakelijk' : 'Prive'}
-								</button>
+								<div className="flex flex-col items-end space-y-3">
+									<div className="text-right">
+										<p className="font-bold text-2xl text-gray-900 dark:text-gray-100">
+											{formatCurrency(reservation.total_costs)}
+										</p>
+										<p className="text-sm text-gray-500 dark:text-gray-400">Totaal</p>
+									</div>
+									<button
+										onClick={() => toggleBusinessStatus(reservation._id!.toString(), reservation.is_business_transaction || false)}
+										className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer flex items-center space-x-1 ${
+											reservation.is_business_transaction
+												? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-900/50'
+												: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-900/50'
+										}`}
+									>
+										<span>{reservation.is_business_transaction ? '💼' : '🏠'}</span>
+										<span>{reservation.is_business_transaction ? 'Zakelijk' : 'Privé'}</span>
+									</button>
+								</div>
 							</div>
 						</div>
 					))}
