@@ -221,7 +221,14 @@ export default function BetalingenPage() {
 				if (payment.bunq_payment_url) {
 					// Open bunq payment link in new tab
 					window.open(payment.bunq_payment_url, '_blank')
-					// alert('Betaling aangemaakt! Je wordt doorgestuurd naar de betalingspagina.')
+					
+					// Show appropriate message based on whether payment was reused
+					if (result.message === 'Existing payment found and reused') {
+						// Don't show alert for existing payment - just open the URL
+						console.log('Reusing existing payment URL')
+					} else {
+						// alert('Betaling aangemaakt! Je wordt doorgestuurd naar de betalingspagina.')
+					}
 				} else {
 					alert('Betaling aangemaakt! Er kon geen automatische betalingslink worden gemaakt.')
 				}

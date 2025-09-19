@@ -46,6 +46,41 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
 
 		const { db } = await connectToDatabase()
 
+		// Check if there's already a valid payment for the same reservations
+		if (body.reservations_paid && body.reservations_paid.length > 0) {
+			// Only reuse payments created within the last 7 days to avoid expired URLs
+			const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+			
+			const existingPayment = await db.collection('Payments').findOne({
+				reservations_paid: { $all: body.reservations_paid },
+				is_business_transaction: body.is_business_transaction,
+				amount_in_euros: roundedAmount,
+				paid_at: null, // Not paid yet
+				bunq_payment_url: { $exists: true, $ne: null }, // Has valid payment URL
+				bunq_status: { $nin: ['REJECTED', 'CANCELLED'] }, // Not rejected or cancelled
+				datetime_created: { $gte: sevenDaysAgo } // Created within last 7 days
+			})
+
+			if (existingPayment) {
+				console.log('Found existing valid payment, reusing:', existingPayment._id)
+				
+				// Return the existing payment instead of creating a new one
+				const existingPaymentWithId: Payment = {
+					...(existingPayment as unknown as Omit<Payment, '_id'>),
+					_id: existingPayment._id.toString()
+				}
+
+				return NextResponse.json(
+					{
+						success: true,
+						data: existingPaymentWithId,
+						message: 'Existing payment found and reused'
+					},
+					{ status: 200 }
+				)
+			}
+		}
+
 		// Create bunq payment request if requested
 		let bunqRequestId: number | undefined
 		let bunqPaymentUrl: string | undefined

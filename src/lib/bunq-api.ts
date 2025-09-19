@@ -146,7 +146,7 @@ class BunqApiClient {
 				'Content-Type': 'application/json',
 				'X-Bunq-Client-Request-Id': this.generateRequestId(),
 				'X-Bunq-Geolocation': '0 0 0 0 NL',
-				'X-Bunq-Language': 'en_US',
+				'X-Bunq-Language': 'nl_NL',
 				'X-Bunq-Region': 'nl_NL',
 				'X-Bunq-Client-Authentication': installationToken
 			},
