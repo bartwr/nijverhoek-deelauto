@@ -170,11 +170,11 @@ class BunqApiClient {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'X-Bunq-Client-Request-Id': this.generateRequestId(),
+				// 'X-Bunq-Client-Request-Id': this.generateRequestId(),
 				'X-Bunq-Geolocation': '0 0 0 0 NL',
-				'X-Bunq-Language': 'en_US',
+				'X-Bunq-Language': 'nl_NL',
 				'X-Bunq-Region': 'nl_NL',
-				'X-Bunq-Client-Signature': '' // Will be set by bunq SDK
+				// 'X-Bunq-Client-Signature': '' // Will be set by bunq SDK
 			},
 			body: JSON.stringify(requestBody)
 		})
