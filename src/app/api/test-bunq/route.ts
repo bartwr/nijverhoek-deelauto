@@ -7,7 +7,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 		const envCheck = {
 			BUNQ_API_KEY: !!process.env.BUNQ_API_KEY,
 			BUNQ_API_BASE_URL: process.env.BUNQ_API_BASE_URL || 'https://api.bunq.com',
-			BUNQ_CLIENT_PUBLIC_KEY: !!process.env.BUNQ_CLIENT_PUBLIC_KEY,
+			BUNQ_INSTALLATION_RESPONSE_TOKEN: !!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN,
 			NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 		}
 
@@ -23,8 +23,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 			context: {
 				userId: context.userId,
 				monetaryAccountId: context.monetaryAccountId,
-				hasInstallationToken: !!context.installationToken,
-				hasDeviceToken: !!context.deviceToken,
 				hasSessionToken: !!context.sessionToken
 			}
 		})
@@ -37,7 +35,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 			environment: {
 				BUNQ_API_KEY: !!process.env.BUNQ_API_KEY,
 				BUNQ_API_BASE_URL: process.env.BUNQ_API_BASE_URL || 'https://api.bunq.com',
-				BUNQ_CLIENT_PUBLIC_KEY: !!process.env.BUNQ_CLIENT_PUBLIC_KEY,
+				BUNQ_INSTALLATION_RESPONSE_TOKEN: !!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN,
 				NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 			}
 		}, { status: 500 })

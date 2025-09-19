@@ -13,11 +13,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 				value: process.env.BUNQ_API_BASE_URL || 'https://api.bunq.com',
 				isSandbox: (process.env.BUNQ_API_BASE_URL || '').includes('sandbox')
 			},
-			BUNQ_CLIENT_PUBLIC_KEY: {
-				exists: !!process.env.BUNQ_CLIENT_PUBLIC_KEY,
-				length: process.env.BUNQ_CLIENT_PUBLIC_KEY?.length || 0,
-				preview: process.env.BUNQ_CLIENT_PUBLIC_KEY ? `${process.env.BUNQ_CLIENT_PUBLIC_KEY.substring(0, 20)}...` : 'Not set',
-				startsWithMII: process.env.BUNQ_CLIENT_PUBLIC_KEY?.startsWith('MII') || false
+			BUNQ_INSTALLATION_RESPONSE_TOKEN: {
+				exists: !!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN,
+				length: process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN?.length || 0,
+				preview: process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN ? `${process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN.substring(0, 20)}...` : 'Not set'
 			},
 			NEXT_PUBLIC_BASE_URL: {
 				value: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
@@ -27,12 +26,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 		// Validate required fields
 		const validation = {
 			hasApiKey: !!process.env.BUNQ_API_KEY,
-			hasPublicKey: !!process.env.BUNQ_CLIENT_PUBLIC_KEY,
-			publicKeyFormat: process.env.BUNQ_CLIENT_PUBLIC_KEY?.startsWith('MII') || false,
+			hasInstallationToken: !!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN,
 			isSandbox: (process.env.BUNQ_API_BASE_URL || '').includes('sandbox')
 		}
 
-		const allValid = validation.hasApiKey && validation.hasPublicKey && validation.publicKeyFormat
+		const allValid = validation.hasApiKey && validation.hasInstallationToken
 
 		return NextResponse.json({
 			success: allValid,
@@ -41,9 +39,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 			validation,
 			recommendations: !allValid ? [
 				!validation.hasApiKey ? 'Add BUNQ_API_KEY to your .env.local file' : null,
-				!validation.hasPublicKey ? 'Add BUNQ_CLIENT_PUBLIC_KEY to your .env.local file' : null,
-				!validation.publicKeyFormat ? 'BUNQ_CLIENT_PUBLIC_KEY should start with "MII" (RSA public key format)' : null,
-				!validation.isSandbox ? 'Consider using sandbox URL: https://sandbox.public.api.bunq.com' : null
+				!validation.hasInstallationToken ? 'Add BUNQ_INSTALLATION_RESPONSE_TOKEN to your .env.local file' : null,
+				!validation.isSandbox ? 'Consider using sandbox URL: https://public-api.sandbox.bunq.com' : null
 			].filter(Boolean) : []
 		})
 	} catch (error) {

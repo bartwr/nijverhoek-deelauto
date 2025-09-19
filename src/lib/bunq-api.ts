@@ -25,8 +25,6 @@ export interface BunqPaymentResponse {
 }
 
 export interface BunqApiContext {
-	installationToken: string
-	deviceToken: string
 	sessionToken: string
 	userId: number
 	monetaryAccountId: number
@@ -62,73 +60,48 @@ class BunqApiClient {
 			baseUrl: this.baseUrl,
 			hasApiKey: !!this.apiKey,
 			apiKeyLength: this.apiKey.length,
-			hasClientPublicKey: !!process.env.BUNQ_CLIENT_PUBLIC_KEY,
-			clientPublicKeyLength: process.env.BUNQ_CLIENT_PUBLIC_KEY?.length || 0
+			hasInstallationToken: !!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN,
+			installationTokenLength: process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN?.length || 0
 		})
 		
 		if (!this.apiKey) {
 			throw new Error('BUNQ_API_KEY environment variable is required')
 		}
 		
-		if (!process.env.BUNQ_CLIENT_PUBLIC_KEY) {
-			throw new Error('BUNQ_CLIENT_PUBLIC_KEY environment variable is required')
+		if (!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN) {
+			throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is required')
 		}
 	}
 
 	/**
-	 * Initialize bunq API context (installation, device registration, session)
+	 * Initialize bunq API context (session only, installation and device registration done manually)
 	 */
 	async initializeContext(): Promise<BunqApiContext> {
 		try {
 			console.log('Starting bunq context initialization...')
 			
-		// Step 1: Create installation
-		console.log('Step 1: Creating installation...')
-		const installationResponse = await this.createInstallation()
-		console.log('Installation response:', JSON.stringify(installationResponse, null, 2))
-		
-		// Extract installation token - bunq API returns it in Response[1].Token.token
-		const installationToken = installationResponse.Response?.[1]?.Token?.token
-		if (!installationToken) {
-			throw new Error('Installation token not found in response')
-		}
+			// Step 1: Start session using pre-configured installation token
+			console.log('Step 1: Starting session...')
+			const sessionResponse = await this.startSession()
+			console.log('Session response:', JSON.stringify(sessionResponse, null, 2))
+			
+			// Extract session token
+			const sessionToken = sessionResponse.Response?.[1]?.Token?.token
+			if (!sessionToken) {
+				throw new Error('Session token not found in response')
+			}
 
-		// Step 2: Register device
-		console.log('Step 2: Registering device...')
-		const deviceResponse = await this.registerDevice(installationToken)
-		console.log('Device response:', JSON.stringify(deviceResponse, null, 2))
-		
-		// Extract device ID (device registration returns ID, not token)
-		const deviceId = deviceResponse.Response?.[0]?.Id?.id
-		if (!deviceId) {
-			throw new Error('Device ID not found in response')
-		}
-		console.log('Device registered with ID:', deviceId)
-
-		// Step 3: Start session
-		console.log('Step 3: Starting session...')
-		const sessionResponse = await this.startSession(installationToken)
-		console.log('Session response:', JSON.stringify(sessionResponse, null, 2))
-		
-		// Extract session token
-		const sessionToken = sessionResponse.Response?.[1]?.Token?.token
-		if (!sessionToken) {
-			throw new Error('Session token not found in response')
-		}
-
-			// Step 4: Get user and monetary account info
-			console.log('Step 4: Getting user info...')
+			// Step 2: Get user and monetary account info
+			console.log('Step 2: Getting user info...')
 			const userInfo = await this.getUserInfo(sessionToken)
 			console.log('User info:', userInfo)
 			const userId = userInfo.id
 			
-			console.log('Step 5: Getting monetary account...')
+			console.log('Step 3: Getting monetary account...')
 			const monetaryAccountId = await this.getMonetaryAccountId(sessionToken, userId)
 			console.log('Monetary account ID:', monetaryAccountId)
 
 			this.context = {
-				installationToken,
-				deviceToken: '', // Device registration doesn't return a token, just an ID
 				sessionToken,
 				userId,
 				monetaryAccountId
@@ -146,98 +119,17 @@ class BunqApiClient {
 		}
 	}
 
+
 	/**
-	 * Create installation
+	 * Start session using pre-configured installation token
 	 */
-	private async createInstallation(): Promise<BunqApiResponse> {
-		const clientPublicKey = process.env.BUNQ_CLIENT_PUBLIC_KEY || ''
+	private async startSession(): Promise<BunqApiResponse> {
+		const installationToken = process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN
 		
-		if (!clientPublicKey) {
-			throw new Error('BUNQ_CLIENT_PUBLIC_KEY environment variable is not set')
+		if (!installationToken) {
+			throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is not set')
 		}
 
-		const requestBody = {
-			client_public_key: clientPublicKey
-		}
-
-		console.log('Creating bunq installation with:', {
-			url: `${this.baseUrl}/v1/installation`,
-			hasPublicKey: !!clientPublicKey,
-			publicKeyLength: clientPublicKey.length
-		})
-
-		const response = await fetch(`${this.baseUrl}/v1/installation`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				// 'X-Bunq-Client-Request-Id': this.generateRequestId(),
-				'X-Bunq-Geolocation': '0 0 0 0 NL',
-				'X-Bunq-Language': 'nl_NL',
-				'X-Bunq-Region': 'nl_NL',
-				// 'X-Bunq-Client-Signature': '' // Will be set by bunq SDK
-			},
-			body: JSON.stringify(requestBody)
-		})
-
-		if (!response.ok) {
-			const errorText = await response.text()
-			console.error('Bunq installation failed:', {
-				status: response.status,
-				statusText: response.statusText,
-				errorBody: errorText
-			})
-			throw new Error(`Installation failed: ${response.status} ${response.statusText} - ${errorText}`)
-		}
-
-		return response.json()
-	}
-
-	/**
-	 * Register device
-	 */
-	private async registerDevice(installationToken: string): Promise<BunqApiResponse> {
-		const requestBody = {
-			description: 'Deelauto Nijverhoek Payment System',
-			secret: this.apiKey
-		}
-
-		console.log('Registering device with:', {
-			url: `${this.baseUrl}/v1/device-server`,
-			hasInstallationToken: !!installationToken,
-			hasApiKey: !!this.apiKey,
-			apiKeyLength: this.apiKey.length
-		})
-
-		const response = await fetch(`${this.baseUrl}/v1/device-server`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'X-Bunq-Client-Request-Id': this.generateRequestId(),
-				'X-Bunq-Geolocation': '0 0 0 0 NL',
-				'X-Bunq-Language': 'en_US',
-				'X-Bunq-Region': 'nl_NL',
-				'X-Bunq-Client-Authentication': installationToken
-			},
-			body: JSON.stringify(requestBody)
-		})
-
-		if (!response.ok) {
-			const errorText = await response.text()
-			console.error('Device registration failed:', {
-				status: response.status,
-				statusText: response.statusText,
-				errorBody: errorText
-			})
-			throw new Error(`Device registration failed: ${response.status} ${response.statusText} - ${errorText}`)
-		}
-
-		return response.json()
-	}
-
-	/**
-	 * Start session
-	 */
-	private async startSession(installationToken: string): Promise<BunqApiResponse> {
 		const requestBody = {
 			secret: this.apiKey
 		}
