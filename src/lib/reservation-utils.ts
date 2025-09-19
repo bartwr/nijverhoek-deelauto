@@ -14,7 +14,7 @@ export function calculateKilometerCosts(
 }
 
 /**
- * Calculate the time-based costs for a reservation
+ * Calculate the time-based costs for a reservation with 10-hour daily cap
  * @param reservedStart - When the reservation was supposed to start
  * @param reservedEnd - When the reservation was supposed to end
  * @param effectiveStart - When the car was actually picked up
@@ -35,12 +35,11 @@ export function calculateTimeCosts(
 		/ 3600000
 	)
 
-	const effectiveReservationCost = (
-		(
-			effectiveEnd.getTime() - effectiveStart.getTime()
-		)
-		* priceScheme.costs_per_effective_hour
-		/ 3600000
+	// Calculate effective cost with daily 10-hour cap
+	const effectiveReservationCost = calculateEffectiveCostWithDailyCap(
+		effectiveStart,
+		effectiveEnd,
+		priceScheme.costs_per_effective_hour
 	)
 
 	const endReservationCost = effectiveEnd > reservedEnd ? 0 : (
@@ -50,6 +49,54 @@ export function calculateTimeCosts(
 	)
 
 	return startReservationCost + effectiveReservationCost + endReservationCost
+}
+
+/**
+ * Calculate effective cost with a 10-hour daily maximum cap
+ * @param effectiveStart - When the effective period started
+ * @param effectiveEnd - When the effective period ended
+ * @param hourlyRate - The hourly rate to apply
+ * @returns The total cost with daily caps applied
+ */
+function calculateEffectiveCostWithDailyCap(
+	effectiveStart: Date,
+	effectiveEnd: Date,
+	hourlyRate: number
+): number {
+	const MAX_DAILY_HOURS = 10
+	let totalCost = 0
+	
+	// Create a copy of the start date to iterate through days
+	const currentDate = new Date(effectiveStart)
+	
+	while (currentDate < effectiveEnd) {
+		// Get the start of the current day (00:00:00)
+		const dayStart = new Date(currentDate)
+		dayStart.setHours(0, 0, 0, 0)
+		
+		// Get the end of the current day (23:59:59.999)
+		const dayEnd = new Date(dayStart)
+		dayEnd.setHours(23, 59, 59, 999)
+		
+		// Determine the actual start and end times for this day
+		const periodStart = new Date(Math.max(currentDate.getTime(), effectiveStart.getTime()))
+		const periodEnd = new Date(Math.min(dayEnd.getTime(), effectiveEnd.getTime()))
+		
+		// Calculate hours for this day
+		const hoursInDay = (periodEnd.getTime() - periodStart.getTime()) / 3600000
+		
+		// Apply the 10-hour cap
+		const chargeableHours = Math.min(hoursInDay, MAX_DAILY_HOURS)
+		
+		// Add to total cost
+		totalCost += chargeableHours * hourlyRate
+		
+		// Move to next day
+		currentDate.setDate(currentDate.getDate() + 1)
+		currentDate.setHours(0, 0, 0, 0)
+	}
+	
+	return totalCost
 }
 
 
@@ -84,7 +131,7 @@ export function calculateTotalCosts(
 }
 
 /**
- * Display a detailed breakdown of how time costs are calculated
+ * Display a detailed breakdown of how time costs are calculated with daily caps
  * @param reservedStart - When the reservation was supposed to start
  * @param reservedEnd - When the reservation was supposed to end
  * @param effectiveStart - When the car was actually picked up
@@ -129,90 +176,153 @@ export function displayTimeCostsCalculation(
 		}).format(amount)
 	}
 
-	// Define time periods with their rates
-	const periods: Array<{
-		start: Date
-		end: Date
-		rate: number
-		rateType: string
-	}> = []
+	const parts: string[] = []
 
 	// Check if there's a start reservation cost (late pickup)
 	if (effectiveStart >= reservedStart) {
 		const startCost = (effectiveStart.getTime() - reservedStart.getTime()) * priceScheme.costs_per_unused_reserved_hour_start_trip / 3600000
 		if (startCost > 0) {
-			periods.push({
-				start: reservedStart,
-				end: effectiveStart,
-				rate: priceScheme.costs_per_unused_reserved_hour_start_trip,
-				rateType: 'start'
-			})
+			const startStr = formatDateTime(reservedStart, effectiveStart)
+			const endStr = formatDateTime(effectiveStart, reservedStart)
+			const rateStr = formatCurrency(priceScheme.costs_per_unused_reserved_hour_start_trip)
+			parts.push(`${startStr} tot ${endStr} maal ${rateStr}/uur (start reservering tot start gebruik)`)
 		}
 	}
 
-	// Effective reservation cost (actual usage time)
-	const effectiveCost = (effectiveEnd.getTime() - effectiveStart.getTime()) * priceScheme.costs_per_effective_hour / 3600000
-	if (effectiveCost > 0) {
-		periods.push({
-			start: effectiveStart,
-			end: effectiveEnd,
-			rate: priceScheme.costs_per_effective_hour,
-			rateType: 'effective'
-		})
+	// Add effective cost breakdown by day with 10-hour cap
+	const effectiveBreakdown = getEffectiveCostBreakdownByDay(
+		effectiveStart,
+		effectiveEnd,
+		priceScheme.costs_per_effective_hour
+	)
+	
+	for (const dayBreakdown of effectiveBreakdown) {
+		parts.push(dayBreakdown)
 	}
 
 	// Check if there's an end reservation cost (early return)
 	if (effectiveEnd <= reservedEnd) {
 		const endCost = (reservedEnd.getTime() - effectiveEnd.getTime()) * priceScheme.costs_per_unused_reserved_hour_end_trip / 3600000
 		if (endCost > 0) {
-			periods.push({
-				start: effectiveEnd,
-				end: reservedEnd,
-				rate: priceScheme.costs_per_unused_reserved_hour_end_trip,
-				rateType: 'end'
-			})
+			const startStr = formatDateTime(effectiveEnd, reservedEnd)
+			const endStr = formatDateTime(reservedEnd, effectiveEnd)
+			const rateStr = formatCurrency(priceScheme.costs_per_unused_reserved_hour_end_trip)
+			parts.push(`${startStr} tot ${endStr} maal ${rateStr}/uur (eind gebruik tot eind reservering)`)
 		}
 	}
 
-	// Merge consecutive periods with the same rate
-	const mergedPeriods: Array<{
-		start: Date
-		end: Date
-		rate: number
-		rateType: string
-	}> = []
+	return parts.join(' + ')
+}
 
-	for (let i = 0; i < periods.length; i++) {
-		const currentPeriod = periods[i]
+/**
+ * Get a breakdown of effective costs by day with 10-hour cap
+ * @param effectiveStart - When the effective period started
+ * @param effectiveEnd - When the effective period ended
+ * @param hourlyRate - The hourly rate to apply
+ * @returns Array of strings describing each day's calculation
+ */
+function getEffectiveCostBreakdownByDay(
+	effectiveStart: Date,
+	effectiveEnd: Date,
+	hourlyRate: number
+): string[] {
+	const MAX_DAILY_HOURS = 10
+	const parts: string[] = []
+	
+	const formatDateTime = (date: Date, referenceDate?: Date) => {
+		const timeStr = date.toLocaleTimeString('nl-NL', {
+			hour: '2-digit',
+			minute: '2-digit'
+		})
+
+		// If referenceDate is provided, check if dates are the same
+		if (referenceDate) {
+			const isSameDate = date.toDateString() === referenceDate.toDateString()
+			if (isSameDate) {
+				return timeStr // Only show time if same date
+			}
+		}
+
+		// Show date and time for different dates
+		const dateStr = date.toLocaleDateString('nl-NL', {
+			day: '2-digit',
+			month: '2-digit'
+		})
+
+		return `${dateStr} ${timeStr}`
+	}
+
+	const formatCurrency = (amount: number) => {
+		return new Intl.NumberFormat('nl-NL', {
+			style: 'currency',
+			currency: 'EUR'
+		}).format(amount)
+	}
+
+	const formatDate = (date: Date) => {
+		return date.toLocaleDateString('nl-NL', {
+			day: '2-digit',
+			month: '2-digit',
+			year: 'numeric'
+		})
+	}
+	
+	// Create a copy of the start date to iterate through days
+	const currentDate = new Date(effectiveStart)
+	
+	while (currentDate < effectiveEnd) {
+		// Get the start of the current day (00:00:00)
+		const dayStart = new Date(currentDate)
+		dayStart.setHours(0, 0, 0, 0)
 		
-		// Check if we can merge with the previous period
-		if (mergedPeriods.length > 0) {
-			const lastPeriod = mergedPeriods[mergedPeriods.length - 1]
-			
-			// Check if rates are the same and periods are consecutive
-			if (lastPeriod.rate === currentPeriod.rate && 
-				lastPeriod.end.getTime() === currentPeriod.start.getTime()) {
-				// Merge periods
-				lastPeriod.end = currentPeriod.end
-				continue
+		// Get the end of the current day (23:59:59.999)
+		const dayEnd = new Date(dayStart)
+		dayEnd.setHours(23, 59, 59, 999)
+		
+		// Determine the actual start and end times for this day
+		const periodStart = new Date(Math.max(currentDate.getTime(), effectiveStart.getTime()))
+		const periodEnd = new Date(Math.min(dayEnd.getTime(), effectiveEnd.getTime()))
+		
+		// Calculate hours for this day
+		const hoursInDay = (periodEnd.getTime() - periodStart.getTime()) / 3600000
+		
+		// Apply the 10-hour cap
+		const chargeableHours = Math.min(hoursInDay, MAX_DAILY_HOURS)
+		
+		// Format the period description
+		const startStr = formatDateTime(periodStart, periodEnd)
+		const endStr = formatDateTime(periodEnd, periodStart)
+		const rateStr = formatCurrency(hourlyRate)
+		
+		// Check if we're spanning multiple days
+		const isMultiDay = effectiveStart.toDateString() !== effectiveEnd.toDateString()
+		
+		let description: string
+		if (isMultiDay) {
+			// Show date for multi-day reservations
+			const dayStr = formatDate(periodStart)
+			if (hoursInDay > MAX_DAILY_HOURS) {
+				description = `${dayStr}: ${startStr} tot ${endStr} = ${hoursInDay.toFixed(1)}u (max ${MAX_DAILY_HOURS}u) maal ${rateStr}/uur`
+			} else {
+				description = `${dayStr}: ${startStr} tot ${endStr} = ${chargeableHours.toFixed(1)}u maal ${rateStr}/uur`
+			}
+		} else {
+			// Single day - no date needed
+			if (hoursInDay > MAX_DAILY_HOURS) {
+				description = `${startStr} tot ${endStr} = ${hoursInDay.toFixed(1)}u (max ${MAX_DAILY_HOURS}u) maal ${rateStr}/uur`
+			} else {
+				description = `${startStr} tot ${endStr} = ${chargeableHours.toFixed(1)}u maal ${rateStr}/uur`
 			}
 		}
 		
-		mergedPeriods.push(currentPeriod)
-	}
-
-	// Format the merged periods
-	const parts: string[] = []
-	
-	for (const period of mergedPeriods) {
-		const startStr = formatDateTime(period.start, period.end)
-		const endStr = formatDateTime(period.end, period.start)
-		const rateStr = formatCurrency(period.rate)
+		parts.push(description)
 		
-		parts.push(`${startStr} tot ${endStr} maal ${rateStr}/uur`)
+		// Move to next day
+		currentDate.setDate(currentDate.getDate() + 1)
+		currentDate.setHours(0, 0, 0, 0)
 	}
-
-	return parts.join(' plus ')
+	
+	return parts
 }
 
 /**

@@ -386,7 +386,9 @@ export default function ReservationsPage() {
                               new Date(reservation.effective_start),
                               new Date(reservation.effective_end),
                               reservation.priceScheme
-                            )}
+                            ).split(' + ').map((line, index) => (
+                              <div key={index} className="mb-1">{line}</div>
+                            ))}
                           </div>
                         </details>
                         </p>
