@@ -59,33 +59,20 @@ export default function BetalingenPage() {
 		return () => clearInterval(interval)
 	}, [])
 
-	// Sync bunq status every 60 seconds when there are outstanding reservations
-	useEffect(() => {
-		const hasOutstandingReservations = Object.keys(outstandingReservations).length > 0
-		
-		if (!hasOutstandingReservations || !isLoggedIn) {
-			return
-		}
-
-		const syncBunqStatus = async () => {
-			try {
-				const response = await fetch('/api/payments/sync-bunq-status')
-				if (response.ok) {
-					const result = await response.json()
-					if (result.success && result.updated_count > 0) {
-						// Refresh payment data if any payments were updated
-						await fetchPaymentData()
-					}
-				}
-			} catch (error) {
-				console.error('Error syncing bunq status:', error)
-			}
-		}
-
-		const interval = setInterval(syncBunqStatus, 60 * 1000) // 30 seconds
-		
-		return () => clearInterval(interval)
-	}, [outstandingReservations, isLoggedIn])
+  const syncBunqStatus = async () => {
+    try {
+      const response = await fetch('/api/payments/sync-bunq-status')
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.updated_count > 0) {
+          // Refresh payment data if any payments were updated
+          await fetchPaymentData()
+        }
+      }
+    } catch (error) {
+      console.error('Error syncing bunq status:', error)
+    }
+  }
 
 	const checkAuthStatus = async () => {
 		try {
@@ -220,7 +207,12 @@ export default function BetalingenPage() {
 				// If bunq payment URL was created, redirect to it
 				if (payment.bunq_payment_url) {
 					// Open bunq payment link in new tab
-					window.open(payment.bunq_payment_url, '_blank')
+					window.open(payment.bunq_payment_url, '_blank');
+          
+          // Sync bunq status after 60 seconds
+          setTimeout(async () => {
+            await syncBunqStatus()
+          }, 60000)
 					
 					// Show appropriate message based on whether payment was reused
 					if (result.message === 'Existing payment found and reused') {
