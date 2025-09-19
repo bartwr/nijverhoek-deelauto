@@ -186,10 +186,13 @@ export default function BetalingenPage() {
 		const userName = reservations[0]?.user?.name || 'Onbekend'
 		const userEmail = reservations[0]?.user?.email_address
 		
+		// Format all reservation details
+		const reservationDetails = reservations.map(reservation => formatReservationDetails(reservation)).join('\n\n')
+		
 		// Create payment request
 		const paymentData = {
 			title: `Deelauto Nijverhoek - ${yearMonth} - ${transactionType} - ${userName}`,
-			description: `Betaling voor ${reservations.length} ${transactionType} reservering(en) in ${yearMonth}`,
+			description: `Betaling voor ${reservations.length} ${transactionType} reservering(en) in ${yearMonth}\n\n👤 ${userName}\n\n${reservationDetails}`,
 			amount_in_euros: totalAmount,
 			is_business_transaction: isBusiness,
 			send_at: new Date().toISOString(),
@@ -245,6 +248,24 @@ export default function BetalingenPage() {
 			hour: '2-digit',
 			minute: '2-digit'
 		})
+	}
+
+	const formatReservationDetails = (reservation: Reservation & { user: User; priceScheme?: PriceScheme }) => {
+		const startDate = new Date(reservation.effective_start)
+		const endDate = new Date(reservation.effective_end)
+		
+		// Format: DD/M HH:MM - HH:MM (XX km)
+		const dayMonth = `${startDate.getDate()}/${startDate.getMonth() + 1}`
+		const startTime = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`
+		const endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`
+		
+		let details = `🚗 ${dayMonth} ${startTime} - ${endTime} (${reservation.kilometers_driven} km)`
+		
+		if (reservation.remarks && reservation.remarks.trim()) {
+			details += `\n🏷️ ${reservation.remarks.trim()}`
+		}
+		
+		return details
 	}
 
 	if (isLoading) {

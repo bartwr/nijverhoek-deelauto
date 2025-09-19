@@ -58,7 +58,7 @@ export function generateLoginEmail(loginUrl: string): { html: string; text: stri
 				<div style="text-align: center; margin: 30px 0;">
 					<a href="${loginUrl}" style="background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Log in</a>
 				</div>
-				<p><strong>De link is 15 minuten geldig.</strong></p>
+				<p>De link is 15 minuten geldig.</p>
 			</div>
 		</body>
 		</html>
