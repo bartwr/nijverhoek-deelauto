@@ -63,7 +63,7 @@ export async function POST(
 
 		// Generate a new session token
 		const sessionToken = crypto.randomBytes(32).toString('hex')
-		const sessionExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+		const sessionExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 3 months (90 days)
 
 		// Create a new admin session
 		const adminSession: Omit<AdminSession, '_id'> = {
@@ -81,7 +81,7 @@ export async function POST(
 			httpOnly: true,
 			secure: process.env.NODE_ENV === 'production',
 			sameSite: 'lax',
-			maxAge: 24 * 60 * 60, // 24 hours in seconds
+			maxAge: 90 * 24 * 60 * 60, // 3 months (90 days) in seconds
 			path: '/'
 		})
 

@@ -43,11 +43,29 @@ export async function GET(
 			})
 		}
 
+		// Extend session by 3 months on each visit
+		const newExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 3 months (90 days)
+		
+		// Update session expiration in database
+		await db.collection('UserSessions').updateOne(
+			{ _id: session._id },
+			{ $set: { expiresAt: newExpiresAt } }
+		)
+
+		// Update cookie expiration
+		cookieStore.set('user_session', sessionToken.value, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			sameSite: 'lax',
+			maxAge: 90 * 24 * 60 * 60, // 3 months (90 days) in seconds
+			path: '/'
+		})
+
 		return NextResponse.json({
 			isLoggedIn: true,
 			user: {
 				email: session.email,
-				expiresAt: session.expiresAt.getTime()
+				expiresAt: newExpiresAt.getTime()
 			}
 		})
 	} catch (error) {

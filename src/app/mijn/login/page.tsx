@@ -68,7 +68,7 @@ function UserLoginContent() {
 
 			if (response.ok) {
 				setMessage('Succesvol ingelogd! Dashboard wordt geladen...')
-				const redirectUrl = searchParams.get('redirect') || '/mijn'
+				const redirectUrl = searchParams.get('redirect') || `/mijn/betalingen`
 				router.push(redirectUrl)
 			} else {
 				setMessage(data.error || 'Invalid login token')
