@@ -1,0 +1,9 @@
+{
+	"buildCommand": "npm run build",
+	"ignoreCommand": "git diff --quiet HEAD^ HEAD",
+	"framework": "nextjs",
+	"regions": ["ams1"],
+	"env": {
+		"NODE_ENV": "production"
+	}
+}

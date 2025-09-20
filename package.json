@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "register-bunq-ip": "node scripts/register-bunq-ip.js",
-    "postbuild": "npm run register-bunq-ip"
+    "setup-auto-ip": "node scripts/setup-auto-ip-registration.js"
   },
   "dependencies": {
     "@types/nodemailer": "^7.0.1",

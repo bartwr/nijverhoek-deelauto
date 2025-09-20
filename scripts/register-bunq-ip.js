@@ -1,17 +1,26 @@
 #!/usr/bin/env node
 
 /**
- * Script to register the server's IP address with bunq API on deployment
- * This should be run after deployment to ensure the new server IP is whitelisted
+ * Script to register the server's IP address with bunq API after deployment
+ * 
+ * This script should be run AFTER deployment is complete and publicly accessible.
+ * 
+ * Usage:
+ *   npm run register-bunq-ip                    # Use environment URL
+ *   node scripts/register-bunq-ip.js <URL>      # Use specific URL
+ * 
+ * Example:
+ *   node scripts/register-bunq-ip.js https://your-app.vercel.app
  */
 
 const https = require('https')
 const http = require('http')
 
-// Get the base URL from environment variables
-const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL 
-	? `https://${process.env.VERCEL_URL}` 
-	: 'http://localhost:3000'
+// Get the base URL from command line args or environment variables
+const baseUrl = process.argv[2] || 
+	process.env.NEXT_PUBLIC_BASE_URL || 
+	(process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+	'http://localhost:3000'
 
 console.log('🚀 Starting bunq IP registration...')
 console.log(`Base URL: ${baseUrl}`)
@@ -58,11 +67,47 @@ function makeRequest(url) {
 	})
 }
 
+// Function to check if the deployment is accessible
+async function checkDeploymentAccessibility() {
+	try {
+		const url = `${baseUrl}/api/bunq/register-ip`
+		console.log(`🔍 Checking if deployment is accessible: ${url}`)
+		
+		const response = await makeRequest(url)
+		
+		// Check if we got the authentication page (HTML response)
+		if (response.status === 401 && response.data.raw && response.data.raw.includes('Authentication Required')) {
+			console.error('❌ Deployment is protected by Vercel deployment protection!')
+			console.error('🔒 The deployment is not yet publicly accessible.')
+			console.error('')
+			console.error('💡 Solutions:')
+			console.error('   1. Wait for deployment protection to be disabled')
+			console.error('   2. Run this script manually after deployment is complete')
+			console.error('   3. Use the Vercel bypass token if available')
+			console.error('')
+			console.error('📖 More info: https://vercel.com/docs/deployment-protection')
+			return false
+		}
+		
+		return true
+	} catch (error) {
+		console.error('💥 Error checking deployment accessibility:', error.message)
+		return false
+	}
+}
+
 // Main execution
 async function registerIp() {
 	try {
+		// First check if the deployment is accessible
+		const isAccessible = await checkDeploymentAccessibility()
+		if (!isAccessible) {
+			console.log('⚠️  Skipping IP registration due to accessibility issues')
+			process.exit(1)
+		}
+		
 		const url = `${baseUrl}/api/bunq/register-ip`
-		console.log(`📡 Making request to: ${url}`)
+		console.log(`📡 Making IP registration request to: ${url}`)
 		
 		const response = await makeRequest(url)
 		
@@ -79,14 +124,13 @@ async function registerIp() {
 		}
 	} catch (error) {
 		console.error('💥 Error during IP registration:', error.message)
-		console.error('This might be expected if the server is not yet running or environment variables are not set')
-		
-		// Don't fail the deployment if IP registration fails
-		// This allows the deployment to continue even if bunq registration fails
-		console.log('⚠️  Continuing deployment despite IP registration failure')
-		process.exit(0)
+		console.error('')
+		console.error('💡 This script should be run AFTER deployment is complete and publicly accessible.')
+		console.error('   Try running it manually with the deployed URL:')
+		console.error(`   node scripts/register-bunq-ip.js ${baseUrl}`)
+		process.exit(1)
 	}
 }
 
-// Add delay to allow server to start up if this is run immediately after deployment
-setTimeout(registerIp, 5000)
+// Run the IP registration
+registerIp()
