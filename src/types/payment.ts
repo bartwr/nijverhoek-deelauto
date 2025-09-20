@@ -11,6 +11,7 @@ export interface Payment {
 	bunq_request_id?: number // bunq payment request ID
 	bunq_payment_url?: string // bunq.me payment link
 	bunq_status?: string // Status of the bunq payment request
+	is_bunq_user_request?: boolean // Whether this is a direct bunq user request (true) or BunqMeTab (false)
 }
 
 export interface CreatePaymentRequest {

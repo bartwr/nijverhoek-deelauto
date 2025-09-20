@@ -91,8 +91,8 @@ export async function updatePaymentBunqStatus(paymentId: string): Promise<{ succ
 			return { success: false, error: 'Payment has no bunq request ID' }
 		}
 		
-		// Check bunq status
-		const newStatus = await checkBunqPaymentStatus(payment.bunq_request_id)
+		// Check bunq status using the appropriate method based on payment type
+		const newStatus = await checkBunqPaymentStatus(payment.bunq_request_id, payment.is_bunq_user_request)
 		
 		// Update the payment if status changed
 		if (payment.bunq_status !== newStatus) {

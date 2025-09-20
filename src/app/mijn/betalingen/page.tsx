@@ -32,6 +32,7 @@ export default function BetalingenPage() {
 
 	useEffect(() => {
 		if (isLoggedIn) {
+      syncBunqStatus();
 			fetchPaymentData()
 		}
 	}, [isLoggedIn])
@@ -97,7 +98,6 @@ export default function BetalingenPage() {
 	}
 
 	const fetchPaymentData = async () => {
-    console.log('fetchPaymentData')
 		try {
 			setIsLoadingPayments(true)
 			

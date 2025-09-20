@@ -168,7 +168,7 @@ export default function InstellingenPage() {
 							</div>
 							<div className="flex-1">
 								<label className="text-sm font-medium text-gray-900 dark:text-gray-100 leading-relaxed cursor-pointer">
-									Wil je dan een bunq request ontvangen als je een bunq account hebt met je e-mailadres?
+									Wil je een bunq request in je bunq-app ontvangen als je een bunq account hebt met je e-mailadres?
 								</label>
 								<p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
 									{settings.use_bunq_user_request 

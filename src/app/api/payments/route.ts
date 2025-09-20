@@ -126,7 +126,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
 			reservations_paid: body.reservations_paid || [],
 			bunq_request_id: bunqRequestId,
 			bunq_payment_url: bunqPaymentUrl,
-			bunq_status: bunqStatus
+			bunq_status: bunqStatus,
+			is_bunq_user_request: isBunqUserRequest
 		}
 
 		const result = await db.collection('Payments').insertOne(payment)
