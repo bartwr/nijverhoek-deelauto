@@ -74,6 +74,7 @@ class BunqApiClient {
 			apiKeyLength: this.apiKey.length,
 			hasPrivateKey: !!this.privateKey,
 			privateKeyLength: this.privateKey.length,
+			privateKeyStartsWith: this.privateKey ? this.privateKey.substring(0, 30) + '...' : 'N/A',
 			hasInstallationToken: !!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN,
 			installationTokenLength: process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN?.length || 0
 		})
@@ -152,17 +153,45 @@ class BunqApiClient {
 		}
 
 		try {
+			let formattedPrivateKey = this.privateKey
+
+			// Handle different private key formats
+			if (this.privateKey.includes('\\n')) {
+				// Fix escaped newlines in private key (common issue with environment variables)
+				formattedPrivateKey = this.privateKey.replace(/\\n/g, '\n')
+			} else if (!this.privateKey.includes('\n') && !this.privateKey.startsWith('-----BEGIN')) {
+				// If it's a base64 encoded key without proper formatting, decode it
+				try {
+					formattedPrivateKey = Buffer.from(this.privateKey, 'base64').toString('utf-8')
+				} catch {
+					// If base64 decoding fails, assume it's already in the correct format
+					console.log('Private key is not base64 encoded, using as-is')
+				}
+			}
+
+			// Ensure the key has proper PEM headers if missing
+			if (!formattedPrivateKey.includes('-----BEGIN')) {
+				console.warn('Private key missing PEM headers, this may cause issues')
+			}
+			
 			// Create SHA256 signature using the private key
 			const sign = crypto.createSign('SHA256')
 			sign.update(data, 'utf8')
 			sign.end()
 			
 			// Sign with the private key and encode as base64
-			const signature = sign.sign(this.privateKey, 'base64')
+			const signature = sign.sign(formattedPrivateKey, 'base64')
 			return signature
 		} catch (error) {
 			console.error('Error creating signature:', error)
-			throw new Error('Failed to create request signature')
+			console.error('Private key length:', this.privateKey?.length)
+			console.error('Private key starts with:', this.privateKey?.substring(0, 50))
+			console.error('Private key format check:', {
+				hasNewlines: this.privateKey.includes('\n'),
+				hasEscapedNewlines: this.privateKey.includes('\\n'),
+				hasPemHeaders: this.privateKey.includes('-----BEGIN')
+			})
+			throw new Error(`Failed to create request signature: ${error instanceof Error ? error.message : 'Unknown error'}`)
 		}
 	}
 
