@@ -1,0 +1,78 @@
+name: Register Bunq IP After Deployment
+
+on:
+  # Trigger after successful deployment
+  deployment_status:
+
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      deployment_url:
+        description: 'Deployment URL (optional, will auto-detect if not provided)'
+        required: false
+        type: string
+
+jobs:
+  register-ip:
+    # Only run on successful deployments or manual triggers
+    if: github.event_name == 'workflow_dispatch' || github.event.deployment_status.state == 'success'
+    
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for deployment to be accessible
+        run: |
+          echo "⏳ Waiting 30 seconds for deployment to be fully accessible..."
+          sleep 30
+
+      - name: Register Bunq IP
+        env:
+          # Environment variables needed for the script
+          BUNQ_API_KEY: ${{ secrets.BUNQ_API_KEY }}
+          BUNQ_INSTALLATION_RESPONSE_TOKEN: ${{ secrets.BUNQ_INSTALLATION_RESPONSE_TOKEN }}
+          BUNQ_API_BASE_URL: ${{ secrets.BUNQ_API_BASE_URL }}
+          NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
+        run: |
+          # Determine the deployment URL
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.deployment_url }}" ]; then
+            DEPLOYMENT_URL="${{ inputs.deployment_url }}"
+            echo "🎯 Using manual deployment URL: $DEPLOYMENT_URL"
+          elif [ "${{ github.event_name }}" = "deployment_status" ]; then
+            DEPLOYMENT_URL="${{ github.event.deployment_status.target_url }}"
+            echo "🎯 Using deployment status URL: $DEPLOYMENT_URL"
+          elif [ -n "$NEXT_PUBLIC_BASE_URL" ]; then
+            DEPLOYMENT_URL="$NEXT_PUBLIC_BASE_URL"
+            echo "🎯 Using environment base URL: $DEPLOYMENT_URL"
+          else
+            echo "❌ Could not determine deployment URL"
+            exit 1
+          fi
+          
+          # Run the IP registration script
+          echo "🚀 Starting IP registration for: $DEPLOYMENT_URL"
+          node scripts/register-bunq-ip.js "$DEPLOYMENT_URL"
+
+      - name: Handle registration failure
+        if: failure()
+        run: |
+          echo "❌ IP registration failed!"
+          echo "💡 This might be due to:"
+          echo "   - Deployment protection still active"
+          echo "   - Network connectivity issues"
+          echo "   - Missing environment variables"
+          echo ""
+          echo "🔄 You can retry manually with:"
+          echo "   gh workflow run register-bunq-ip.yml"
+          exit 1
