@@ -24,6 +24,9 @@ const mongoOptions: MongoClientOptions = {
 	retryWrites: true,
 	retryReads: true,
 	maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
+	tls: true, // Explicitly enable TLS
+	tlsAllowInvalidCertificates: false, // Ensure certificate validation
+	tlsAllowInvalidHostnames: false, // Ensure hostname validation
 }
 
 async function createConnection(): Promise<{ client: MongoClient; db: Db }> {

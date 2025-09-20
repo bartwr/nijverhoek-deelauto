@@ -5,6 +5,7 @@ export interface User {
 	datetime_created: Date
 	email_address: string
 	name: string
+	use_bunq_user_request?: boolean // If true, create direct bunq user requests instead of universal payment URLs
 }
 
 export interface PriceScheme {

@@ -16,6 +16,17 @@ export interface BunqPaymentRequest {
 	redirect_url?: string
 }
 
+export interface BunqMeTabRequest {
+	bunqme_tab_entry: {
+		amount_inquired: {
+			value: string
+			currency: string
+		}
+		description: string
+		redirect_url?: string
+	}
+}
+
 export interface BunqPaymentResponse {
 	id: number
 	amount: {
@@ -25,6 +36,23 @@ export interface BunqPaymentResponse {
 	description: string
 	bunqme_share_url?: string
 	status: string
+}
+
+export interface BunqMeTabResponse {
+	id: number
+	created: string
+	updated: string
+	time_expiry: string | null
+	monetary_account_id: number
+	bunqme_tab_share_url: string
+	bunqme_tab_entry: {
+		amount_inquired: {
+			value: string
+			currency: string
+		}
+		description: string
+		redirect_url?: string
+	}[]
 }
 
 export interface BunqApiContext {
@@ -38,6 +66,7 @@ interface BunqApiResponse {
 		Id?: { id: number };
 		Token?: { token: string };
 		RequestInquiry?: BunqPaymentResponse;
+		BunqMeTab?: BunqMeTabResponse;
 		UserPerson?: { id: number };
 		MonetaryAccountBank?: { id: number };
 	}>;
@@ -463,6 +492,53 @@ class BunqApiClient {
 	}
 
 	/**
+	 * Create a BunqMeTab (universal payment link that works for all users)
+	 */
+	async createBunqMeTab(tabData: BunqMeTabRequest): Promise<BunqMeTabResponse> {
+		if (!this.context) {
+			await this.initializeContext()
+		}
+
+		if (!this.context) {
+			throw new Error('Failed to initialize bunq context')
+		}
+
+		const { sessionToken, userId, monetaryAccountId } = this.context
+
+		const response = await fetch(
+			`${this.baseUrl}/v1/user/${userId}/monetary-account/${monetaryAccountId}/bunqme-tab`,
+			{
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-Bunq-Client-Authentication': sessionToken,
+					'X-Bunq-Client-Request-Id': this.generateRequestId(),
+					'X-Bunq-Geolocation': '0 0 0 0 NL',
+					'X-Bunq-Language': 'en_US',
+					'X-Bunq-Region': 'nl_NL'
+				},
+				body: JSON.stringify(tabData)
+			}
+		)
+
+		if (!response.ok) {
+			const errorText = await response.text()
+			throw new Error(`BunqMeTab creation failed: ${response.statusText} - ${errorText}`)
+		}
+
+		const data = await response.json() as BunqApiResponse
+		console.log('Bunq BunqMeTab response:', JSON.stringify(data, null, 2))
+		
+		// Check if we have the expected response structure
+		if (!data.Response || !data.Response[0] || !data.Response[0].BunqMeTab) {
+			console.error('Unexpected BunqMeTab response structure:', data)
+			throw new Error('Unexpected BunqMeTab response structure from bunq API')
+		}
+		
+		return data.Response[0].BunqMeTab
+	}
+
+	/**
 	 * Get request inquiry details by ID
 	 */
 	private async getRequestInquiryDetails(requestId: number): Promise<BunqPaymentResponse> {
@@ -606,39 +682,82 @@ export const bunqApi = new BunqApiClient()
 
 /**
  * Helper function to create a bunq payment request for the deelauto system
+ * Checks user preference to decide between direct bunq user request or universal payment URL
  */
 export async function createBunqPaymentRequest(
 	amount: number,
 	description: string,
 	userEmail: string,
 	redirectUrl?: string
-): Promise<{ paymentUrl: string; requestId: number }> {
+): Promise<{ paymentUrl: string | null; requestId: number; isBunqUserRequest: boolean }> {
 	try {
-		const paymentRequest: BunqPaymentRequest = {
-			amount_inquired: {
-				value: amount.toFixed(2),
-				currency: 'EUR'
-			},
-			counterparty_alias: {
-				type: 'EMAIL',
-				value: userEmail
-			},
-			description,
-			allow_bunqme: true,
-			redirect_url: redirectUrl
-		}
-
-		const response = await bunqApi.createPaymentRequest(paymentRequest)
-		console.log('Payment request response:', JSON.stringify(response, null, 2))
+		// Import here to avoid circular dependency
+		const { connectToDatabase } = await import('./mongodb')
+		const { User } = await import('../types/models')
 		
-		if (!response.bunqme_share_url) {
-			console.error('No bunqme_share_url in response:', response)
-			throw new Error('No payment URL returned from bunq')
-		}
+		// Look up the user to check their preference
+		const { db } = await connectToDatabase()
+		const user = await db.collection('Users').findOne({
+			email_address: userEmail
+		}) as any // Type assertion to avoid import issues
+		
+		const shouldUseBunqUserRequest = user?.use_bunq_user_request === true
+		
+		if (shouldUseBunqUserRequest) {
+			// Create direct bunq user request (original RequestInquiry method)
+			console.log(`Creating direct bunq user request for ${userEmail}`)
+			
+			const paymentRequest: BunqPaymentRequest = {
+				amount_inquired: {
+					value: amount.toFixed(2),
+					currency: 'EUR'
+				},
+				counterparty_alias: {
+					type: 'EMAIL',
+					value: userEmail
+				},
+				description,
+				allow_bunqme: true,
+				redirect_url: redirectUrl
+			}
 
-		return {
-			paymentUrl: response.bunqme_share_url,
-			requestId: response.id
+			const response = await bunqApi.createPaymentRequest(paymentRequest)
+			console.log('Direct bunq user request response:', JSON.stringify(response, null, 2))
+			
+			// For bunq users, bunqme_share_url will be null - this is expected
+			return {
+				paymentUrl: response.bunqme_share_url || null,
+				requestId: response.id,
+				isBunqUserRequest: true
+			}
+		} else {
+			// Create universal payment URL (BunqMeTab method)
+			console.log(`Creating universal payment URL for ${userEmail}`)
+			
+			const bunqMeTabRequest: BunqMeTabRequest = {
+				bunqme_tab_entry: {
+					amount_inquired: {
+						value: amount.toFixed(2),
+						currency: 'EUR'
+					},
+					description,
+					redirect_url: redirectUrl
+				}
+			}
+
+			const response = await bunqApi.createBunqMeTab(bunqMeTabRequest)
+			console.log('BunqMeTab response:', JSON.stringify(response, null, 2))
+			
+			if (!response.bunqme_tab_share_url) {
+				console.error('No bunqme_tab_share_url in response:', response)
+				throw new Error('No payment URL returned from bunq')
+			}
+
+			return {
+				paymentUrl: response.bunqme_tab_share_url,
+				requestId: response.id,
+				isBunqUserRequest: false
+			}
 		}
 	} catch (error) {
 		console.error('Error creating bunq payment request:', error)

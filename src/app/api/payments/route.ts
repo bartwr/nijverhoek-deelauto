@@ -85,6 +85,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
 		let bunqRequestId: number | undefined
 		let bunqPaymentUrl: string | undefined
 		let bunqStatus: string | undefined
+		let isBunqUserRequest = false
 
 		if (body.create_bunq_request && body.user_email) {
 			try {
@@ -98,6 +99,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
 				bunqRequestId = bunqResponse.requestId
 				bunqPaymentUrl = bunqResponse.paymentUrl
 				bunqStatus = 'PENDING'
+				isBunqUserRequest = bunqResponse.isBunqUserRequest
+				
+				// Log the type of request created
+				if (isBunqUserRequest) {
+					console.log(`Created direct bunq user request for ${body.user_email} (no payment URL needed)`)
+				} else {
+					console.log(`Created universal payment URL for ${body.user_email}: ${bunqPaymentUrl}`)
+				}
 			} catch (error) {
 				console.error('Error creating bunq payment request:', error)
 				// Continue with payment creation even if bunq request fails
