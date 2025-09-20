@@ -1,6 +1,4 @@
-
 import crypto from 'crypto'
-import { networkInterfaces } from 'os'
 
 export interface BunqPaymentRequest {
 	amount_inquired: {
@@ -31,16 +29,21 @@ export interface BunqApiContext {
 	sessionToken: string
 	userId: number
 	monetaryAccountId: number
+	installationToken: string
 }
 
 interface BunqApiResponse {
 	Response: Array<{
-		Id?: { id: number };
-		Token?: { token: string };
-		RequestInquiry?: BunqPaymentResponse;
-		UserPerson?: { id: number };
-		MonetaryAccountBank?: { id: number };
-	}>;
+		Id?: { id: number }
+		Token?: { token: string }
+		RequestInquiry?: BunqPaymentResponse
+		UserPerson?: { id: number }
+		MonetaryAccountBank?: { id: number }
+		Installation?: {
+			token: { token: string }
+			server_public_key: { server_public_key: string }
+		}
+	}>
 }
 
 /**
@@ -86,52 +89,24 @@ export async function getExternalIpAddress(): Promise<string> {
 			}
 		}
 		
-		// Fallback to local IP detection
-		console.warn('Could not get external IP, falling back to local IP detection')
-		return getLocalIpAddress()
+		throw new Error('Could not determine external IP address')
 	} catch (error) {
 		console.error('Error getting external IP address:', error)
-		return getLocalIpAddress()
+		throw error
 	}
-}
-
-/**
- * Get the server's local IP address (fallback)
- */
-function getLocalIpAddress(): string {
-	const nets = networkInterfaces()
-	const results: string[] = []
-
-	for (const name of Object.keys(nets)) {
-		const netInfo = nets[name]
-		if (!netInfo) continue
-
-		for (const net of netInfo) {
-			// Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
-			if (net.family === 'IPv4' && !net.internal) {
-				results.push(net.address)
-			}
-		}
-	}
-
-	return results.length > 0 ? results[0] : 'Unknown'
 }
 
 class BunqApiClient {
 	private baseUrl: string
 	private apiKey: string | null = null
+	private clientPublicKey: string | null = null
 	private privateKey: string | null = null
+	private accountId: number | null = null
 	private context: BunqApiContext | null = null
 	private initialized = false
 
 	constructor() {
-		// Use correct sandbox URL if not specified
 		this.baseUrl = process.env.BUNQ_API_BASE_URL || 'https://api.bunq.com'
-		
-		// Fix common incorrect sandbox URLs
-		if (this.baseUrl.includes('sandbox.public.api.bunq.com')) {
-			this.baseUrl = 'https://public-api.sandbox.bunq.com'
-		}
 	}
 
 	/**
@@ -141,100 +116,125 @@ class BunqApiClient {
 		if (this.initialized) return
 
 		this.apiKey = process.env.BUNQ_API_KEY || ''
+		this.clientPublicKey = process.env.BUNQ_CLIENT_PUBLIC_KEY || ''
 		this.privateKey = process.env.BUNQ_PRIVATE_KEY_FOR_SIGNING || ''
+		this.accountId = process.env.BUNQ_ACCOUNT_ID_FOR_REQUESTS ? 
+			parseInt(process.env.BUNQ_ACCOUNT_ID_FOR_REQUESTS, 10) : null
 		
 		console.log('BunqApiClient initialized with:', {
 			baseUrl: this.baseUrl,
 			hasApiKey: !!this.apiKey,
-			apiKeyLength: this.apiKey.length,
+			hasClientPublicKey: !!this.clientPublicKey,
 			hasPrivateKey: !!this.privateKey,
-			privateKeyLength: this.privateKey.length,
-			privateKeyStartsWith: this.privateKey ? this.privateKey.substring(0, 30) + '...' : 'N/A',
-			hasInstallationToken: !!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN,
-			installationTokenLength: process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN?.length || 0
+			accountId: this.accountId
 		})
 		
 		if (!this.apiKey) {
 			throw new Error('BUNQ_API_KEY environment variable is required')
 		}
 		
-		if (!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN) {
-			throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is required')
+		if (!this.clientPublicKey) {
+			throw new Error('BUNQ_CLIENT_PUBLIC_KEY environment variable is required')
 		}
 
 		if (!this.privateKey) {
 			throw new Error('BUNQ_PRIVATE_KEY_FOR_SIGNING environment variable is required')
 		}
 
+		if (!this.accountId) {
+			throw new Error('BUNQ_ACCOUNT_ID_FOR_REQUESTS environment variable is required')
+		}
+
 		this.initialized = true
 	}
 
 	/**
-	 * Initialize bunq API context (session only, installation and device registration done manually)
+	 * Step 1: Installation - Register client public key with bunq
 	 */
-	async initializeContext(): Promise<BunqApiContext> {
-		try {
-			// Initialize environment variables first
-			this.initializeEnvironment()
-			
-			console.log('Starting bunq context initialization...')
-			
-			// Optional: Register IP address if in production environment
-			// This is a fallback in case the deployment script doesn't run
-			if (process.env.NODE_ENV === 'production' && process.env.BUNQ_AUTO_REGISTER_IP === 'true') {
-				console.log('Auto-registering IP address for production environment...')
-				try {
-					const ipResult = await this.registerServerIpAddress()
-					if (ipResult.success) {
-						console.log('✅ IP auto-registration successful during context initialization')
-					} else {
-						console.warn('⚠️ IP auto-registration failed during context initialization:', ipResult.message)
-					}
-				} catch (error) {
-					console.warn('⚠️ IP auto-registration error during context initialization:', error)
-					// Don't fail context initialization if IP registration fails
-				}
-			}
-			
-			// Step 1: Start session using pre-configured installation token
-			console.log('Step 1: Starting session...')
-			const sessionResponse = await this.startSession()
-			console.log('Session response:', JSON.stringify(sessionResponse, null, 2))
-			
-			// Extract session token
-			const sessionToken = sessionResponse.Response?.[1]?.Token?.token
-			if (!sessionToken) {
-				throw new Error('Session token not found in response')
-			}
-
-			// Step 2: Get user and monetary account info
-			console.log('Step 2: Getting user info...')
-			const userInfo = await this.getUserInfo(sessionToken)
-			console.log('User info:', userInfo)
-			const userId = userInfo.id
-			
-			console.log('Step 3: Getting monetary account...')
-			const monetaryAccountId = await this.getMonetaryAccountId(sessionToken, userId)
-			console.log('Monetary account ID:', monetaryAccountId)
-
-			this.context = {
-				sessionToken,
-				userId,
-				monetaryAccountId
-			}
-
-			console.log('Bunq context initialized successfully')
-			return this.context
-		} catch (error) {
-			console.error('Error initializing bunq context:', error)
-			console.error('Error details:', {
-				message: error instanceof Error ? error.message : 'Unknown error',
-				stack: error instanceof Error ? error.stack : undefined
-			})
-			throw new Error(`Failed to initialize bunq API context: ${error instanceof Error ? error.message : 'Unknown error'}`)
+	async performInstallation(): Promise<string> {
+		this.initializeEnvironment()
+		
+		console.log('Step 1: Performing bunq installation...')
+		
+		const requestBody = {
+			client_public_key: this.clientPublicKey
 		}
+
+		const response = await fetch(`${this.baseUrl}/v1/installation`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'User-Agent': 'nijverhoek-deelauto/1.0'
+			},
+			body: JSON.stringify(requestBody)
+		})
+
+		if (!response.ok) {
+			const errorText = await response.text()
+			console.error('Installation failed:', {
+				status: response.status,
+				statusText: response.statusText,
+				errorBody: errorText
+			})
+			throw new Error(`Installation failed: ${response.status} ${response.statusText} - ${errorText}`)
+		}
+
+		const data = await response.json() as BunqApiResponse
+		console.log('Installation response:', JSON.stringify(data, null, 2))
+		
+		// Extract installation token from response
+		const installationToken = data.Response?.[1]?.Token?.token
+		if (!installationToken) {
+			throw new Error('Installation token not found in response')
+		}
+
+		console.log('✅ Installation successful, token:', installationToken)
+		return installationToken
 	}
 
+	/**
+	 * Step 2: Device registration - Register this server with bunq
+	 */
+	async performDeviceRegistration(installationToken: string): Promise<void> {
+		console.log('Step 2: Performing device registration...')
+		
+		// Get the server's external IP address
+		const ipAddress = await getExternalIpAddress()
+		console.log(`Registering with IP address: ${ipAddress}`)
+
+		const requestBody = {
+			description: "Nijverhoek Deelauto",
+			secret: this.apiKey,
+			permitted_ips: [ipAddress]
+		}
+
+		const response = await fetch(`${this.baseUrl}/v1/device-server`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'User-Agent': 'nijverhoek-deelauto/1.0',
+				'X-Bunq-Client-Authentication': installationToken
+			},
+			body: JSON.stringify(requestBody)
+		})
+
+		if (!response.ok) {
+			const errorText = await response.text()
+			console.error('Device registration failed:', {
+				status: response.status,
+				statusText: response.statusText,
+				errorBody: errorText
+			})
+			
+			// Log the curl command for debugging
+			console.log(`curl -L --request POST --url '${this.baseUrl}/v1/device-server' --header 'User-Agent: nijverhoek-deelauto/1.0' --header 'X-Bunq-Client-Authentication: ${installationToken}' --header 'Content-Type: application/json' --data '${JSON.stringify(requestBody)}'`)
+			
+			throw new Error(`Device registration failed: ${response.status} ${response.statusText} - ${errorText}`)
+		}
+
+		const responseData = await response.json()
+		console.log('✅ Device registration successful:', JSON.stringify(responseData, null, 2))
+	}
 
 	/**
 	 * Create a signature for bunq API requests using the private key
@@ -276,31 +276,16 @@ class BunqApiClient {
 			return signature
 		} catch (error) {
 			console.error('Error creating signature:', error)
-			console.error('Private key length:', this.privateKey?.length)
-			console.error('Private key starts with:', this.privateKey?.substring(0, 50))
-			console.error('Private key format check:', {
-				hasNewlines: this.privateKey.includes('\n'),
-				hasEscapedNewlines: this.privateKey.includes('\\n'),
-				hasPemHeaders: this.privateKey.includes('-----BEGIN')
-			})
 			throw new Error(`Failed to create request signature: ${error instanceof Error ? error.message : 'Unknown error'}`)
 		}
 	}
 
 	/**
-	 * Start session using pre-configured installation token
+	 * Step 3: Start session with signature
 	 */
-	private async startSession(): Promise<BunqApiResponse> {
-		const installationToken = process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN
+	async startSession(installationToken: string): Promise<string> {
+		console.log('Step 3: Starting session with signature...')
 		
-		if (!installationToken) {
-			throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is not set')
-		}
-
-		if (!this.apiKey) {
-			throw new Error('API key not initialized')
-		}
-
 		const requestBody = {
 			secret: this.apiKey
 		}
@@ -337,15 +322,24 @@ class BunqApiClient {
 				statusText: response.statusText,
 				errorBody: errorText
 			})
-      // Console.log the fetch command as a cURL command:
-      console.log(`curl -X POST ${this.baseUrl}/v1/session-server -H "Content-Type: application/json" -H "User-Agent: nijverhoek-deelauto/1.0" -H "X-Bunq-Client-Request-Id: ${this.generateRequestId()}" -H "X-Bunq-Geolocation: 0 0 0 0 NL" -H "X-Bunq-Language: en_US" -H "X-Bunq-Region: nl_NL" -H "X-Bunq-Client-Authentication: ${installationToken}" -H "X-Bunq-Client-Signature: ${signature}" -d '${requestBodyString}'`)
-      // Console.log server IP address of this app:
-      const serverIp = await getExternalIpAddress()
-      console.log(`Server IP address: ${serverIp}`)
+			
+			// Log the curl command for debugging
+			console.log(`curl -L --request POST --url '${this.baseUrl}/v1/session-server' --header 'User-Agent: nijverhoek-deelauto/1.0' --header 'X-Bunq-Client-Request-Id: ${this.generateRequestId()}' --header 'X-Bunq-Geolocation: 0 0 0 0 NL' --header 'X-Bunq-Language: nl_NL' --header 'X-Bunq-Region: nl_NL' --header 'X-Bunq-Client-Authentication: ${installationToken}' --header 'X-Bunq-Client-Signature: ${signature}' --data '${requestBodyString}'`)
+			
 			throw new Error(`Session start failed: ${response.status} ${response.statusText} - ${errorText}`)
 		}
 
-		return response.json()
+		const data = await response.json() as BunqApiResponse
+		console.log('Session response:', JSON.stringify(data, null, 2))
+		
+		// Extract session token
+		const sessionToken = data.Response?.[1]?.Token?.token
+		if (!sessionToken) {
+			throw new Error('Session token not found in response')
+		}
+
+		console.log('✅ Session started successfully')
+		return sessionToken
 	}
 
 	/**
@@ -358,7 +352,7 @@ class BunqApiClient {
 				'X-Bunq-Client-Authentication': sessionToken,
 				'X-Bunq-Client-Request-Id': this.generateRequestId(),
 				'X-Bunq-Geolocation': '0 0 0 0 NL',
-				'X-Bunq-Language': 'en_US',
+				'X-Bunq-Language': 'nl_NL',
 				'X-Bunq-Region': 'nl_NL'
 			}
 		})
@@ -372,43 +366,42 @@ class BunqApiClient {
 	}
 
 	/**
-	 * Get monetary account ID - use configured account for payment requests
+	 * Initialize bunq API context with complete authentication flow
 	 */
-	private async getMonetaryAccountId(sessionToken: string, userId: number): Promise<number> {
-		// Check if specific account ID is configured via environment variable
-		const configuredAccountId = process.env.BUNQ_ACCOUNT_ID_FOR_REQUESTS
-		if (configuredAccountId) {
-			const accountId = parseInt(configuredAccountId, 10)
-			if (!isNaN(accountId)) {
-				console.log(`Using configured monetary account ID: ${accountId}`)
-				return accountId
-			} else {
-				console.warn(`Invalid BUNQ_ACCOUNT_ID_FOR_REQUESTS value: ${configuredAccountId}. Must be a number.`)
+	async initializeContext(): Promise<BunqApiContext> {
+		try {
+			this.initializeEnvironment()
+			
+			console.log('🚀 Starting complete bunq authentication flow...')
+			
+			// Step 1: Installation
+			const installationToken = await this.performInstallation()
+			
+			// Step 2: Device registration
+			await this.performDeviceRegistration(installationToken)
+			
+			// Step 3: Start session
+			const sessionToken = await this.startSession(installationToken)
+			
+			// Step 4: Get user info
+			console.log('Step 4: Getting user info...')
+			const userInfo = await this.getUserInfo(sessionToken)
+			const userId = userInfo.id
+			console.log('User ID:', userId)
+
+			this.context = {
+				sessionToken,
+				userId,
+				monetaryAccountId: this.accountId!,
+				installationToken
 			}
+
+			console.log('✅ Bunq context initialized successfully')
+			return this.context
+		} catch (error) {
+			console.error('❌ Error initializing bunq context:', error)
+			throw new Error(`Failed to initialize bunq API context: ${error instanceof Error ? error.message : 'Unknown error'}`)
 		}
-
-		// Fallback: fetch the available monetary accounts
-		console.log('No specific account ID configured, fetching available accounts...')
-		const response = await fetch(`${this.baseUrl}/v1/user/${userId}/monetary-account`, {
-			method: 'GET',
-			headers: {
-				'X-Bunq-Client-Authentication': sessionToken,
-				'X-Bunq-Client-Request-Id': this.generateRequestId(),
-				'X-Bunq-Geolocation': '0 0 0 0 NL',
-				'X-Bunq-Language': 'en_US',
-				'X-Bunq-Region': 'nl_NL'
-			}
-		})
-
-		if (!response.ok) {
-			throw new Error(`Get monetary account failed: ${response.statusText}`)
-		}
-
-		const data = await response.json() as BunqApiResponse
-		console.log('Available monetary accounts:', JSON.stringify(data, null, 2))
-		
-		// Return the first monetary account ID as fallback
-		return data.Response[0].MonetaryAccountBank!.id
 	}
 
 	/**
@@ -425,6 +418,13 @@ class BunqApiClient {
 
 		const { sessionToken, userId, monetaryAccountId } = this.context
 
+		console.log('Creating payment request for:', {
+			userId,
+			monetaryAccountId,
+			amount: paymentData.amount_inquired.value,
+			description: paymentData.description
+		})
+
 		const response = await fetch(
 			`${this.baseUrl}/v1/user/${userId}/monetary-account/${monetaryAccountId}/request-inquiry`,
 			{
@@ -434,7 +434,7 @@ class BunqApiClient {
 					'X-Bunq-Client-Authentication': sessionToken,
 					'X-Bunq-Client-Request-Id': this.generateRequestId(),
 					'X-Bunq-Geolocation': '0 0 0 0 NL',
-					'X-Bunq-Language': 'en_US',
+					'X-Bunq-Language': 'nl_NL',
 					'X-Bunq-Region': 'nl_NL'
 				},
 				body: JSON.stringify(paymentData)
@@ -443,6 +443,11 @@ class BunqApiClient {
 
 		if (!response.ok) {
 			const errorText = await response.text()
+			console.error('Payment request creation failed:', {
+				status: response.status,
+				statusText: response.statusText,
+				errorBody: errorText
+			})
 			throw new Error(`Payment request creation failed: ${response.statusText} - ${errorText}`)
 		}
 
@@ -480,7 +485,7 @@ class BunqApiClient {
 					'X-Bunq-Client-Authentication': sessionToken,
 					'X-Bunq-Client-Request-Id': this.generateRequestId(),
 					'X-Bunq-Geolocation': '0 0 0 0 NL',
-					'X-Bunq-Language': 'en_US',
+					'X-Bunq-Language': 'nl_NL',
 					'X-Bunq-Region': 'nl_NL'
 				}
 			}
@@ -515,82 +520,6 @@ class BunqApiClient {
 		}
 
 		return await this.getRequestInquiryDetails(requestId)
-	}
-
-	/**
-	 * Register the server's IP address with bunq API for device-server
-	 */
-	async registerServerIpAddress(): Promise<{ success: boolean; ipAddress: string; message: string }> {
-		try {
-			// Initialize environment variables
-			this.initializeEnvironment()
-
-			// Get the server's external IP address
-			const ipAddress = await getExternalIpAddress()
-			console.log(`Registering IP address with bunq: ${ipAddress}`)
-
-			const installationToken = process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN
-			if (!installationToken) {
-				throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is required')
-			}
-
-			if (!this.apiKey) {
-				throw new Error('BUNQ_API_KEY environment variable is required')
-			}
-
-			// Prepare the device-server registration request
-			const requestBody = {
-				description: "Nijverhoek Deelauto",
-				secret: this.apiKey,
-				permitted_ips: [ipAddress]
-			}
-
-			const requestBodyString = JSON.stringify(requestBody)
-
-			console.log('Registering device-server with bunq API...')
-			const response = await fetch(`${this.baseUrl}/v1/device-server`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'User-Agent': 'nijverhoek-deelauto/1.0',
-					'X-Bunq-Client-Authentication': installationToken
-				},
-				body: requestBodyString
-			})
-
-			if (!response.ok) {
-				const errorText = await response.text()
-				console.error('Device-server registration failed:', {
-					status: response.status,
-					statusText: response.statusText,
-					errorBody: errorText
-				})
-				
-				// Log the curl command for debugging
-				console.log(`curl -L --request POST --url '${this.baseUrl}/v1/device-server' --header 'User-Agent: nijverhoek-deelauto/1.0' --header 'X-Bunq-Client-Authentication: ${installationToken}' --header 'Content-Type: application/json' --data '${requestBodyString}'`)
-				
-				throw new Error(`Device-server registration failed: ${response.status} ${response.statusText} - ${errorText}`)
-			}
-
-			const responseData = await response.json()
-			console.log('Device-server registration successful:', JSON.stringify(responseData, null, 2))
-
-			return {
-				success: true,
-				ipAddress,
-				message: `Successfully registered IP address ${ipAddress} with bunq API`
-			}
-
-		} catch (error) {
-			console.error('Error registering server IP address:', error)
-			const ipAddress = await getExternalIpAddress().catch(() => 'Unknown')
-			
-			return {
-				success: false,
-				ipAddress,
-				message: `Failed to register IP address: ${error instanceof Error ? error.message : 'Unknown error'}`
-			}
-		}
 	}
 
 	/**
@@ -674,11 +603,4 @@ export async function checkBunqPaymentStatus(requestId: number): Promise<string>
 		console.error('Error checking bunq payment status:', error)
 		throw new Error('Failed to check bunq payment status')
 	}
-}
-
-/**
- * Helper function to register server IP address with bunq API
- */
-export async function registerBunqServerIp(): Promise<{ success: boolean; ipAddress: string; message: string }> {
-	return await bunqApi.registerServerIpAddress()
 }
