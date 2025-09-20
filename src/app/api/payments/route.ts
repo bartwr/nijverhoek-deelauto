@@ -97,7 +97,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
 				)
 				
 				bunqRequestId = bunqResponse.requestId
-				bunqPaymentUrl = bunqResponse.paymentUrl
+				bunqPaymentUrl = bunqResponse.paymentUrl || undefined
 				bunqStatus = 'PENDING'
 				isBunqUserRequest = bunqResponse.isBunqUserRequest
 				

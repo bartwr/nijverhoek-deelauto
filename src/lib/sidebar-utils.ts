@@ -13,7 +13,8 @@ function getPreviousMonth(): string {
 export function getUserSidebarItems(currentPath: string, yearmonth?: string): SidebarItem[] {
 	const baseItems: SidebarItem[] = [
 		{ href: '/mijn', label: 'Start', isActive: false },
-		{ href: '/mijn/betalingen', label: 'Betalingen', isActive: false }
+		{ href: '/mijn/betalingen', label: 'Betalingen', isActive: false },
+		{ href: '/mijn/instellingen', label: 'Instellingen', isActive: false }
 	]
 
 	// Add reservations item with dynamic yearmonth or default to previous month

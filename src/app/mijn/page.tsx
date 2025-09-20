@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
+import { getUserSidebarItems } from '@/lib/sidebar-utils'
 
 interface User {
 	email: string
@@ -76,11 +77,7 @@ export default function MijnStartPage() {
 		return null // Will redirect to login
 	}
 
-	const sidebarItems = [
-		{ href: '/mijn', label: 'Start', isActive: true },
-		{ href: '/mijn/betalingen', label: 'Betalingen', isActive: false },
-		{ href: `/mijn/reserveringen/${getPreviousMonth()}`, label: 'Reserveringen', isActive: false }
-	]
+	const sidebarItems = getUserSidebarItems('/mijn')
 
 	return (
 		<AdminLayout

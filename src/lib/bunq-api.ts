@@ -366,8 +366,6 @@ class BunqApiClient {
 				statusText: response.statusText,
 				errorBody: errorText
 			})
-      // Console.log the fetch command as a cURL command:
-      console.log(`curl -X POST ${this.baseUrl}/v1/session-server -H "Content-Type: application/json" -H "User-Agent: nijverhoek-deelauto/1.0" -H "X-Bunq-Client-Request-Id: ${this.generateRequestId()}" -H "X-Bunq-Geolocation: 0 0 0 0 NL" -H "X-Bunq-Language: en_US" -H "X-Bunq-Region: nl_NL" -H "X-Bunq-Client-Authentication: ${installationToken}" -H "X-Bunq-Client-Signature: ${signature}" -d '${requestBodyString}'`)
       // Console.log server IP address of this app:
       const serverIp = await getExternalIpAddress()
       console.log(`Server IP address: ${serverIp}`)
@@ -682,7 +680,12 @@ export const bunqApi = new BunqApiClient()
 
 /**
  * Helper function to create a bunq payment request for the deelauto system
- * Checks user preference to decide between direct bunq user request or universal payment URL
+ * 
+ * Behavior based on user preference:
+ * - If user.use_bunq_user_request === true: Creates direct bunq user request (RequestInquiry)
+ *   → bunq users receive request directly in app, paymentUrl will be null
+ * - If user.use_bunq_user_request === false/undefined: Creates universal payment URL (BunqMeTab)
+ *   → all users (bunq and non-bunq) get a web payment link
  */
 export async function createBunqPaymentRequest(
 	amount: number,
@@ -693,13 +696,12 @@ export async function createBunqPaymentRequest(
 	try {
 		// Import here to avoid circular dependency
 		const { connectToDatabase } = await import('./mongodb')
-		const { User } = await import('../types/models')
 		
 		// Look up the user to check their preference
 		const { db } = await connectToDatabase()
 		const user = await db.collection('Users').findOne({
 			email_address: userEmail
-		}) as any // Type assertion to avoid import issues
+		}) as { use_bunq_user_request?: boolean } | null
 		
 		const shouldUseBunqUserRequest = user?.use_bunq_user_request === true
 		

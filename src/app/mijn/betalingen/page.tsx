@@ -204,9 +204,9 @@ export default function BetalingenPage() {
 				// Refresh the data
 				await fetchPaymentData()
 				
-				// If bunq payment URL was created, redirect to it
+				// Handle bunq payment based on whether URL was created
 				if (payment.bunq_payment_url) {
-					// Open bunq payment link in new tab
+					// Universal payment URL - open in new tab
 					window.open(payment.bunq_payment_url, '_blank');
           
           // Sync bunq status after 60 seconds
@@ -221,7 +221,16 @@ export default function BetalingenPage() {
 					} else {
 						// alert('Betaling aangemaakt! Je wordt doorgestuurd naar de betalingspagina.')
 					}
+				} else if (payment.bunq_request_id) {
+					// Direct bunq user request - no URL needed, user will see it in their bunq app
+					alert('Betaling aangemaakt! Je ontvangt het betalingsverzoek direct in je bunq app.')
+					
+					// Sync bunq status after 30 seconds (faster for direct requests)
+					setTimeout(async () => {
+						await syncBunqStatus()
+					}, 30000)
 				} else {
+					// No bunq integration
 					alert('Betaling aangemaakt! Er kon geen automatische betalingslink worden gemaakt.')
 				}
 			} else {
