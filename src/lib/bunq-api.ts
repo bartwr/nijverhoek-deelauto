@@ -1,4 +1,6 @@
 
+import crypto from 'crypto'
+
 export interface BunqPaymentRequest {
 	amount_inquired: {
 		value: string
@@ -42,8 +44,10 @@ interface BunqApiResponse {
 
 class BunqApiClient {
 	private baseUrl: string
-	private apiKey: string
+	private apiKey: string | null = null
+	private privateKey: string | null = null
 	private context: BunqApiContext | null = null
+	private initialized = false
 
 	constructor() {
 		// Use correct sandbox URL if not specified
@@ -53,13 +57,23 @@ class BunqApiClient {
 		if (this.baseUrl.includes('sandbox.public.api.bunq.com')) {
 			this.baseUrl = 'https://public-api.sandbox.bunq.com'
 		}
-		
+	}
+
+	/**
+	 * Initialize environment variables and validate them
+	 */
+	private initializeEnvironment(): void {
+		if (this.initialized) return
+
 		this.apiKey = process.env.BUNQ_API_KEY || ''
+		this.privateKey = process.env.BUNQ_PRIVATE_KEY_FOR_SIGNING || ''
 		
 		console.log('BunqApiClient initialized with:', {
 			baseUrl: this.baseUrl,
 			hasApiKey: !!this.apiKey,
 			apiKeyLength: this.apiKey.length,
+			hasPrivateKey: !!this.privateKey,
+			privateKeyLength: this.privateKey.length,
 			hasInstallationToken: !!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN,
 			installationTokenLength: process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN?.length || 0
 		})
@@ -71,6 +85,12 @@ class BunqApiClient {
 		if (!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN) {
 			throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is required')
 		}
+
+		if (!this.privateKey) {
+			throw new Error('BUNQ_PRIVATE_KEY_FOR_SIGNING environment variable is required')
+		}
+
+		this.initialized = true
 	}
 
 	/**
@@ -78,6 +98,9 @@ class BunqApiClient {
 	 */
 	async initializeContext(): Promise<BunqApiContext> {
 		try {
+			// Initialize environment variables first
+			this.initializeEnvironment()
+			
 			console.log('Starting bunq context initialization...')
 			
 			// Step 1: Start session using pre-configured installation token
@@ -121,6 +144,29 @@ class BunqApiClient {
 
 
 	/**
+	 * Create a signature for bunq API requests using the private key
+	 */
+	private createSignature(data: string): string {
+		if (!this.privateKey) {
+			throw new Error('Private key not initialized')
+		}
+
+		try {
+			// Create SHA256 signature using the private key
+			const sign = crypto.createSign('SHA256')
+			sign.update(data, 'utf8')
+			sign.end()
+			
+			// Sign with the private key and encode as base64
+			const signature = sign.sign(this.privateKey, 'base64')
+			return signature
+		} catch (error) {
+			console.error('Error creating signature:', error)
+			throw new Error('Failed to create request signature')
+		}
+	}
+
+	/**
 	 * Start session using pre-configured installation token
 	 */
 	private async startSession(): Promise<BunqApiResponse> {
@@ -130,27 +176,37 @@ class BunqApiClient {
 			throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is not set')
 		}
 
+		if (!this.apiKey) {
+			throw new Error('API key not initialized')
+		}
+
 		const requestBody = {
 			secret: this.apiKey
 		}
 
+		const requestBodyString = JSON.stringify(requestBody)
+		const signature = this.createSignature(requestBodyString)
+
 		console.log('Starting session with:', {
 			url: `${this.baseUrl}/v1/session-server`,
 			hasInstallationToken: !!installationToken,
-			hasApiKey: !!this.apiKey
+			hasApiKey: !!this.apiKey,
+			hasSignature: !!signature
 		})
 
 		const response = await fetch(`${this.baseUrl}/v1/session-server`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
+				'User-Agent': 'nijverhoek-deelauto/1.0',
 				'X-Bunq-Client-Request-Id': this.generateRequestId(),
 				'X-Bunq-Geolocation': '0 0 0 0 NL',
 				'X-Bunq-Language': 'nl_NL',
 				'X-Bunq-Region': 'nl_NL',
-				'X-Bunq-Client-Authentication': installationToken
+				'X-Bunq-Client-Authentication': installationToken,
+				'X-Bunq-Client-Signature': signature
 			},
-			body: JSON.stringify(requestBody)
+			body: requestBodyString
 		})
 
 		if (!response.ok) {
@@ -190,9 +246,23 @@ class BunqApiClient {
 	}
 
 	/**
-	 * Get monetary account ID
+	 * Get monetary account ID - use configured account for payment requests
 	 */
 	private async getMonetaryAccountId(sessionToken: string, userId: number): Promise<number> {
+		// Check if specific account ID is configured via environment variable
+		const configuredAccountId = process.env.BUNQ_ACCOUNT_ID_FOR_REQUESTS
+		if (configuredAccountId) {
+			const accountId = parseInt(configuredAccountId, 10)
+			if (!isNaN(accountId)) {
+				console.log(`Using configured monetary account ID: ${accountId}`)
+				return accountId
+			} else {
+				console.warn(`Invalid BUNQ_ACCOUNT_ID_FOR_REQUESTS value: ${configuredAccountId}. Must be a number.`)
+			}
+		}
+
+		// Fallback: fetch the available monetary accounts
+		console.log('No specific account ID configured, fetching available accounts...')
 		const response = await fetch(`${this.baseUrl}/v1/user/${userId}/monetary-account`, {
 			method: 'GET',
 			headers: {
@@ -209,7 +279,9 @@ class BunqApiClient {
 		}
 
 		const data = await response.json() as BunqApiResponse
-		// Return the first monetary account ID
+		console.log('Available monetary accounts:', JSON.stringify(data, null, 2))
+		
+		// Return the first monetary account ID as fallback
 		return data.Response[0].MonetaryAccountBank!.id
 	}
 

@@ -8,6 +8,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 			BUNQ_API_KEY: !!process.env.BUNQ_API_KEY,
 			BUNQ_API_BASE_URL: process.env.BUNQ_API_BASE_URL || 'https://api.bunq.com',
 			BUNQ_INSTALLATION_RESPONSE_TOKEN: !!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN,
+			BUNQ_PRIVATE_KEY_FOR_SIGNING: !!process.env.BUNQ_PRIVATE_KEY_FOR_SIGNING,
+			BUNQ_ACCOUNT_ID_FOR_REQUESTS: process.env.BUNQ_ACCOUNT_ID_FOR_REQUESTS || 'not set (will use first available account)',
 			NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 		}
 
@@ -36,6 +38,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 				BUNQ_API_KEY: !!process.env.BUNQ_API_KEY,
 				BUNQ_API_BASE_URL: process.env.BUNQ_API_BASE_URL || 'https://api.bunq.com',
 				BUNQ_INSTALLATION_RESPONSE_TOKEN: !!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN,
+				BUNQ_PRIVATE_KEY_FOR_SIGNING: !!process.env.BUNQ_PRIVATE_KEY_FOR_SIGNING,
+				BUNQ_ACCOUNT_ID_FOR_REQUESTS: process.env.BUNQ_ACCOUNT_ID_FOR_REQUESTS || 'not set (will use first available account)',
 				NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 			}
 		}, { status: 500 })
