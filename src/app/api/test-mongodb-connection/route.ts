@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectToDatabase } from '@/lib/mongodb'
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function GET(_request: NextRequest): Promise<NextResponse> {
 	try {
 		console.log('🧪 Testing MongoDB connection...')
 		console.log('Environment:', process.env.NODE_ENV)
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 		console.log('Node.js version:', process.version)
 		
 		// Test the MongoDB connection
-		const { client, db } = await connectToDatabase()
+		const { db } = await connectToDatabase()
 		
 		// Get database stats
 		const stats = await db.stats()
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 			errorDetails = {
 				name: error.name,
 				message: error.message,
-				code: (error as any).code,
+				code: 'code' in error ? (error as { code: number }).code : undefined,
 				stack: error.stack
 			}
 		}
