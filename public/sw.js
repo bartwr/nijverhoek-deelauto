@@ -1,4 +1,4 @@
-const CACHE_NAME = 'deelauto-nijverhoek-v1'
+const CACHE_NAME = 'deelauto-nijverhoek-v2'
 const urlsToCache = [
   '/',
   '/manifest.json',
