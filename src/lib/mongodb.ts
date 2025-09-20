@@ -38,7 +38,6 @@ const mongoOptions: MongoClientOptions = {
 	// Connection pool options
 	minPoolSize: 1,
 	maxConnecting: 2,
-	maxIdleTimeMS: 30000,
 	waitQueueTimeoutMS: 30000,
 }
 
