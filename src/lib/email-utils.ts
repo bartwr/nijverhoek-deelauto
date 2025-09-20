@@ -55,7 +55,7 @@ export function generateLoginEmail(loginUrl: string): { html: string; text: stri
 			<div style="max-width: 600px; margin: 0 auto; padding: 20px;">
 				<h1 style="color: #2563eb;">Deelauto Nijverhoek</h1>
 				<p>Klik op de volgende link om in te loggen:</p>
-				<div style="text-align: center; margin: 30px 0;">
+				<div style="margin: 30px 0;">
 					<a href="${loginUrl}" style="background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Log in</a>
 				</div>
 				<p>De link is 15 minuten geldig.</p>
