@@ -1,7 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+interface TestResult {
+	success?: boolean
+	error?: string
+	skipped?: string
+}
+
+interface TestResults {
+	asIs: TestResult
+	withNewlines: TestResult
+	base64Decoded: TestResult
+}
+
+export async function GET(): Promise<NextResponse> {
 	try {
 		const privateKey = process.env.BUNQ_PRIVATE_KEY_FOR_SIGNING || ''
 		
@@ -23,7 +35,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 		}
 
 		// Test different formatting approaches
-		const testResults: any = {}
+		const testResults: TestResults = {
+			asIs: {},
+			withNewlines: {},
+			base64Decoded: {}
+		}
 
 		// Test 1: Use key as-is
 		try {
@@ -94,7 +110,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 	}
 }
 
-function getRecommendation(testResults: any): string {
+function getRecommendation(testResults: TestResults): string {
 	if (testResults.asIs?.success) {
 		return 'Private key works as-is'
 	} else if (testResults.withNewlines?.success) {
