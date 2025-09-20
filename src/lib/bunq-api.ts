@@ -44,9 +44,61 @@ interface BunqApiResponse {
 }
 
 /**
- * Get the server's IP address
+ * Get the server's external IP address using a public service
  */
-function getServerIpAddress(): string {
+export async function getExternalIpAddress(): Promise<string> {
+	try {
+		// Try multiple services in case one is down
+		const services = [
+			'https://api.ipify.org?format=text',
+			'https://icanhazip.com',
+			'https://ifconfig.me/ip'
+		]
+
+		for (const service of services) {
+			try {
+				// Create a timeout promise
+				const timeoutPromise = new Promise<never>((_, reject) => {
+					setTimeout(() => reject(new Error('Request timeout')), 5000)
+				})
+				
+				// Race between fetch and timeout
+				const response = await Promise.race([
+					fetch(service, {
+						headers: {
+							'User-Agent': 'nijverhoek-deelauto/1.0'
+						}
+					}),
+					timeoutPromise
+				])
+				
+				if (response.ok) {
+					const ip = (await response.text()).trim()
+					// Validate IP format
+					if (/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(ip)) {
+						console.log(`External IP address detected: ${ip}`)
+						return ip
+					}
+				}
+			} catch (error) {
+				console.warn(`Failed to get IP from ${service}:`, error)
+				continue
+			}
+		}
+		
+		// Fallback to local IP detection
+		console.warn('Could not get external IP, falling back to local IP detection')
+		return getLocalIpAddress()
+	} catch (error) {
+		console.error('Error getting external IP address:', error)
+		return getLocalIpAddress()
+	}
+}
+
+/**
+ * Get the server's local IP address (fallback)
+ */
+function getLocalIpAddress(): string {
 	const nets = networkInterfaces()
 	const results: string[] = []
 
@@ -126,6 +178,23 @@ class BunqApiClient {
 			this.initializeEnvironment()
 			
 			console.log('Starting bunq context initialization...')
+			
+			// Optional: Register IP address if in production environment
+			// This is a fallback in case the deployment script doesn't run
+			if (process.env.NODE_ENV === 'production' && process.env.BUNQ_AUTO_REGISTER_IP === 'true') {
+				console.log('Auto-registering IP address for production environment...')
+				try {
+					const ipResult = await this.registerServerIpAddress()
+					if (ipResult.success) {
+						console.log('✅ IP auto-registration successful during context initialization')
+					} else {
+						console.warn('⚠️ IP auto-registration failed during context initialization:', ipResult.message)
+					}
+				} catch (error) {
+					console.warn('⚠️ IP auto-registration error during context initialization:', error)
+					// Don't fail context initialization if IP registration fails
+				}
+			}
 			
 			// Step 1: Start session using pre-configured installation token
 			console.log('Step 1: Starting session...')
@@ -271,7 +340,8 @@ class BunqApiClient {
       // Console.log the fetch command as a cURL command:
       console.log(`curl -X POST ${this.baseUrl}/v1/session-server -H "Content-Type: application/json" -H "User-Agent: nijverhoek-deelauto/1.0" -H "X-Bunq-Client-Request-Id: ${this.generateRequestId()}" -H "X-Bunq-Geolocation: 0 0 0 0 NL" -H "X-Bunq-Language: en_US" -H "X-Bunq-Region: nl_NL" -H "X-Bunq-Client-Authentication: ${installationToken}" -H "X-Bunq-Client-Signature: ${signature}" -d '${requestBodyString}'`)
       // Console.log server IP address of this app:
-      console.log(`Server IP address: ${getServerIpAddress()}`)
+      const serverIp = await getExternalIpAddress()
+      console.log(`Server IP address: ${serverIp}`)
 			throw new Error(`Session start failed: ${response.status} ${response.statusText} - ${errorText}`)
 		}
 
@@ -448,6 +518,82 @@ class BunqApiClient {
 	}
 
 	/**
+	 * Register the server's IP address with bunq API for device-server
+	 */
+	async registerServerIpAddress(): Promise<{ success: boolean; ipAddress: string; message: string }> {
+		try {
+			// Initialize environment variables
+			this.initializeEnvironment()
+
+			// Get the server's external IP address
+			const ipAddress = await getExternalIpAddress()
+			console.log(`Registering IP address with bunq: ${ipAddress}`)
+
+			const installationToken = process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN
+			if (!installationToken) {
+				throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is required')
+			}
+
+			if (!this.apiKey) {
+				throw new Error('BUNQ_API_KEY environment variable is required')
+			}
+
+			// Prepare the device-server registration request
+			const requestBody = {
+				description: "Nijverhoek Deelauto",
+				secret: this.apiKey,
+				permitted_ips: [ipAddress]
+			}
+
+			const requestBodyString = JSON.stringify(requestBody)
+
+			console.log('Registering device-server with bunq API...')
+			const response = await fetch(`${this.baseUrl}/v1/device-server`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'User-Agent': 'nijverhoek-deelauto/1.0',
+					'X-Bunq-Client-Authentication': installationToken
+				},
+				body: requestBodyString
+			})
+
+			if (!response.ok) {
+				const errorText = await response.text()
+				console.error('Device-server registration failed:', {
+					status: response.status,
+					statusText: response.statusText,
+					errorBody: errorText
+				})
+				
+				// Log the curl command for debugging
+				console.log(`curl -L --request POST --url '${this.baseUrl}/v1/device-server' --header 'User-Agent: nijverhoek-deelauto/1.0' --header 'X-Bunq-Client-Authentication: ${installationToken}' --header 'Content-Type: application/json' --data '${requestBodyString}'`)
+				
+				throw new Error(`Device-server registration failed: ${response.status} ${response.statusText} - ${errorText}`)
+			}
+
+			const responseData = await response.json()
+			console.log('Device-server registration successful:', JSON.stringify(responseData, null, 2))
+
+			return {
+				success: true,
+				ipAddress,
+				message: `Successfully registered IP address ${ipAddress} with bunq API`
+			}
+
+		} catch (error) {
+			console.error('Error registering server IP address:', error)
+			const ipAddress = await getExternalIpAddress().catch(() => 'Unknown')
+			
+			return {
+				success: false,
+				ipAddress,
+				message: `Failed to register IP address: ${error instanceof Error ? error.message : 'Unknown error'}`
+			}
+		}
+	}
+
+	/**
 	 * Generate a unique request ID
 	 */
 	private generateRequestId(): string {
@@ -528,4 +674,11 @@ export async function checkBunqPaymentStatus(requestId: number): Promise<string>
 		console.error('Error checking bunq payment status:', error)
 		throw new Error('Failed to check bunq payment status')
 	}
+}
+
+/**
+ * Helper function to register server IP address with bunq API
+ */
+export async function registerBunqServerIp(): Promise<{ success: boolean; ipAddress: string; message: string }> {
+	return await bunqApi.registerServerIpAddress()
 }

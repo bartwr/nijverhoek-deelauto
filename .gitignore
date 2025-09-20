@@ -42,3 +42,5 @@ next-env.d.ts
 
 bunq-sandbox-vars/*
 bunq-production-vars/*
+installation.key
+installation.pub

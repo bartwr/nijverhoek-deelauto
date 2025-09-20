@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "register-bunq-ip": "node scripts/register-bunq-ip.js",
+    "postbuild": "npm run register-bunq-ip"
   },
   "dependencies": {
     "@types/nodemailer": "^7.0.1",
