@@ -1,5 +1,6 @@
 
 import crypto from 'crypto'
+import { networkInterfaces } from 'os'
 
 export interface BunqPaymentRequest {
 	amount_inquired: {
@@ -40,6 +41,28 @@ interface BunqApiResponse {
 		UserPerson?: { id: number };
 		MonetaryAccountBank?: { id: number };
 	}>;
+}
+
+/**
+ * Get the server's IP address
+ */
+function getServerIpAddress(): string {
+	const nets = networkInterfaces()
+	const results: string[] = []
+
+	for (const name of Object.keys(nets)) {
+		const netInfo = nets[name]
+		if (!netInfo) continue
+
+		for (const net of netInfo) {
+			// Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
+			if (net.family === 'IPv4' && !net.internal) {
+				results.push(net.address)
+			}
+		}
+	}
+
+	return results.length > 0 ? results[0] : 'Unknown'
 }
 
 class BunqApiClient {
@@ -245,6 +268,10 @@ class BunqApiClient {
 				statusText: response.statusText,
 				errorBody: errorText
 			})
+      // Console.log the fetch command as a cURL command:
+      console.log(`curl -X POST ${this.baseUrl}/v1/session-server -H "Content-Type: application/json" -H "User-Agent: nijverhoek-deelauto/1.0" -H "X-Bunq-Client-Request-Id: ${this.generateRequestId()}" -H "X-Bunq-Geolocation: 0 0 0 0 NL" -H "X-Bunq-Language: en_US" -H "X-Bunq-Region: nl_NL" -H "X-Bunq-Client-Authentication: ${installationToken}" -H "X-Bunq-Client-Signature: ${signature}" -d '${requestBodyString}'`)
+      // Console.log server IP address of this app:
+      console.log(`Server IP address: ${getServerIpAddress()}`)
 			throw new Error(`Session start failed: ${response.status} ${response.statusText} - ${errorText}`)
 		}
 
