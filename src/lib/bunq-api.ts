@@ -527,13 +527,17 @@ class BunqApiClient {
 		const data = await response.json() as BunqApiResponse
 		console.log('Bunq BunqMeTab response:', JSON.stringify(data, null, 2))
 		
-		// Check if we have the expected response structure
-		if (!data.Response || !data.Response[0] || !data.Response[0].BunqMeTab) {
+		// Check if we have the expected ID response structure
+		if (!data.Response || !data.Response[0] || !data.Response[0].Id || !data.Response[0].Id.id) {
 			console.error('Unexpected BunqMeTab response structure:', data)
 			throw new Error('Unexpected BunqMeTab response structure from bunq API')
 		}
 		
-		return data.Response[0].BunqMeTab
+		const tabId = data.Response[0].Id.id
+		console.log('Created BunqMeTab with ID:', tabId)
+		
+		// Now fetch the full BunqMeTab object to get the bunqme_tab_share_url
+		return await this.getBunqMeTabDetails(tabId)
 	}
 
 	/**
@@ -574,6 +578,46 @@ class BunqApiClient {
 		}
 		
 		return data.Response[0].RequestInquiry
+	}
+
+	/**
+	 * Get BunqMeTab details by ID
+	 */
+	private async getBunqMeTabDetails(tabId: number): Promise<BunqMeTabResponse> {
+		if (!this.context) {
+			throw new Error('Bunq context not initialized')
+		}
+
+		const { sessionToken, userId, monetaryAccountId } = this.context
+
+		const response = await fetch(
+			`${this.baseUrl}/v1/user/${userId}/monetary-account/${monetaryAccountId}/bunqme-tab/${tabId}`,
+			{
+				method: 'GET',
+				headers: {
+					'X-Bunq-Client-Authentication': sessionToken,
+					'X-Bunq-Client-Request-Id': this.generateRequestId(),
+					'X-Bunq-Geolocation': '0 0 0 0 NL',
+					'X-Bunq-Language': 'en_US',
+					'X-Bunq-Region': 'nl_NL'
+				}
+			}
+		)
+
+		if (!response.ok) {
+			const errorText = await response.text()
+			throw new Error(`Get BunqMeTab details failed: ${response.statusText} - ${errorText}`)
+		}
+
+		const data = await response.json() as BunqApiResponse
+		console.log('BunqMeTab details:', JSON.stringify(data, null, 2))
+		
+		if (!data.Response || !data.Response[0] || !data.Response[0].BunqMeTab) {
+			console.error('Unexpected BunqMeTab details structure:', data)
+			throw new Error('Unexpected BunqMeTab details structure from bunq API')
+		}
+		
+		return data.Response[0].BunqMeTab
 	}
 
 	/**
