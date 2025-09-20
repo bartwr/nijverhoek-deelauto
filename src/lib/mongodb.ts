@@ -14,7 +14,7 @@ if (!MONGODB_DB) {
 let cachedClient: MongoClient | null = null
 let cachedDb: Db | null = null
 
-// MongoDB connection options for better reliability
+// MongoDB connection options for better reliability and SSL compatibility
 const mongoOptions: MongoClientOptions = {
 	maxPoolSize: 10, // Maintain up to 10 socket connections
 	serverSelectionTimeoutMS: 30000, // Keep trying to send operations for 30 seconds
@@ -24,6 +24,22 @@ const mongoOptions: MongoClientOptions = {
 	retryWrites: true,
 	retryReads: true,
 	maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
+	
+	// SSL/TLS options for better compatibility with Vercel
+	tls: true,
+	tlsAllowInvalidCertificates: false,
+	tlsAllowInvalidHostnames: false,
+	tlsInsecure: false,
+	
+	// Additional options for MongoDB Atlas compatibility
+	authSource: 'admin',
+	authMechanism: 'SCRAM-SHA-1',
+	
+	// Connection pool options
+	minPoolSize: 1,
+	maxConnecting: 2,
+	maxIdleTimeMS: 30000,
+	waitQueueTimeoutMS: 30000,
 }
 
 async function createConnection(): Promise<{ client: MongoClient; db: Db }> {
@@ -31,6 +47,8 @@ async function createConnection(): Promise<{ client: MongoClient; db: Db }> {
 		console.log('Attempting to connect to MongoDB...')
 		console.log('MongoDB URI (masked):', MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'))
 		console.log('Database name:', MONGODB_DB)
+		console.log('Node.js version:', process.version)
+		console.log('Environment:', process.env.NODE_ENV)
 		
 		const client = new MongoClient(MONGODB_URI, mongoOptions)
 		await client.connect()
@@ -48,7 +66,66 @@ async function createConnection(): Promise<{ client: MongoClient; db: Db }> {
 		if (error instanceof Error) {
 			console.error('Error name:', error.name)
 			console.error('Error message:', error.message)
+			console.error('Error stack:', error.stack)
 		}
+		throw error
+	}
+}
+
+// Vercel-specific connection method to handle SSL/TLS issues
+async function createVercelConnection(): Promise<{ client: MongoClient; db: Db }> {
+	try {
+		console.log('Attempting Vercel-optimized MongoDB connection...')
+		
+		// Vercel-specific options to handle SSL/TLS issues
+		const vercelOptions: MongoClientOptions = {
+			maxPoolSize: 5, // Smaller pool size for serverless
+			serverSelectionTimeoutMS: 15000, // Shorter timeout for serverless
+			socketTimeoutMS: 30000,
+			connectTimeoutMS: 15000,
+			retryWrites: true,
+			retryReads: true,
+			
+			// SSL/TLS options specifically for Vercel
+			tls: true,
+			tlsAllowInvalidCertificates: false,
+			tlsAllowInvalidHostnames: false,
+			
+			// Use SCRAM-SHA-256 which is more compatible
+			authMechanism: 'SCRAM-SHA-256',
+			authSource: 'admin',
+			
+			// Disable compression to avoid SSL issues
+			compressors: [],
+			
+			// Connection pool options for serverless
+			minPoolSize: 0,
+			maxConnecting: 1,
+			maxIdleTimeMS: 10000,
+			waitQueueTimeoutMS: 15000,
+		}
+		
+		// Ensure the URI has proper SSL parameters
+		let vercelUri = MONGODB_URI
+		if (!vercelUri.includes('ssl=true') && !vercelUri.includes('tls=true')) {
+			const separator = vercelUri.includes('?') ? '&' : '?'
+			vercelUri += `${separator}ssl=true&authSource=admin`
+		}
+		
+		console.log('Using Vercel-optimized URI and options')
+		const client = new MongoClient(vercelUri, vercelOptions)
+		await client.connect()
+		
+		console.log('Vercel MongoDB client connected successfully')
+		
+		// Test the connection
+		await client.db('admin').command({ ping: 1 })
+		console.log('Vercel MongoDB ping test successful')
+		
+		const db = client.db(MONGODB_DB)
+		return { client, db }
+	} catch (error) {
+		console.error('Failed to create Vercel MongoDB connection:', error)
 		throw error
 	}
 }
@@ -109,7 +186,20 @@ export async function connectToDatabase(retryCount = 0): Promise<{ client: Mongo
 			}
 		}
 
-		// Try SRV connection first
+		// Try Vercel-optimized connection first (best for production)
+		if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+			try {
+				console.log('Using Vercel-optimized connection method')
+				const { client, db } = await createVercelConnection()
+				cachedClient = client
+				cachedDb = db
+				return { client, db }
+			} catch (vercelError) {
+				console.warn('Vercel connection failed, trying standard SRV connection:', vercelError)
+			}
+		}
+		
+		// Try standard SRV connection
 		try {
 			const { client, db } = await createConnection()
 			cachedClient = client
