@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useCallback } from 'react'
 import AdminLayout from '@/components/AdminLayout'
 import { Payment } from '@/types/payment'
 import { Reservation, User, PriceScheme } from '@/types/models'
@@ -26,78 +27,7 @@ export default function BetalingenPage() {
 	const [paymentCooldowns, setPaymentCooldowns] = useState<{ [key: string]: number }>({})
 	const router = useRouter()
 
-	useEffect(() => {
-		checkAuthStatus()
-	}, [])
-
-	useEffect(() => {
-		if (isLoggedIn) {
-      syncBunqStatus();
-			fetchPaymentData()
-		}
-	}, [isLoggedIn])
-
-	// Update cooldown timers every second
-	useEffect(() => {
-		const interval = setInterval(() => {
-			setPaymentCooldowns(prev => {
-				const now = Date.now()
-				const updated = { ...prev }
-				let hasChanges = false
-				
-				Object.keys(updated).forEach(key => {
-					const timeDiff = now - updated[key]
-					if (timeDiff >= 10 * 1000) { // 10 seconds
-						delete updated[key]
-						hasChanges = true
-					}
-				})
-				
-				return hasChanges ? updated : prev
-			})
-		}, 1000)
-		
-		return () => clearInterval(interval)
-	}, [])
-
-  const syncBunqStatus = async () => {
-    try {
-      const response = await fetch('/api/payments/sync-bunq-status')
-      if (response.ok) {
-        const result = await response.json()
-        if (result.success && result.updated_count > 0) {
-          // Refresh payment data if any payments were updated
-          await fetchPaymentData()
-        }
-      }
-    } catch (error) {
-      console.error('Error syncing bunq status:', error)
-    }
-  }
-
-	const checkAuthStatus = async () => {
-		try {
-			const response = await fetch('/api/user/check-auth')
-			if (response.ok) {
-				const data = await response.json()
-				if (data.isLoggedIn) {
-					setIsLoggedIn(true)
-					setUser(data.user)
-				} else {
-					router.push(`/mijn/login?redirect=${encodeURIComponent(window.location.pathname)}`)
-				}
-			} else {
-				router.push(`/mijn/login?redirect=${encodeURIComponent(window.location.pathname)}`)
-			}
-		} catch (error) {
-			console.error('Error checking auth status:', error)
-			router.push(`/mijn/login?redirect=${encodeURIComponent(window.location.pathname)}`)
-		} finally {
-			setIsLoading(false)
-		}
-	}
-
-	const fetchPaymentData = async () => {
+	const fetchPaymentData = useCallback(async () => {
 		try {
 			setIsLoadingPayments(true)
 			
@@ -121,7 +51,78 @@ export default function BetalingenPage() {
 		} finally {
 			setIsLoadingPayments(false)
 		}
-	}
+	}, [])
+
+  const syncBunqStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/payments/sync-bunq-status')
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.updated_count > 0) {
+          // Refresh payment data if any payments were updated
+          await fetchPaymentData()
+        }
+      }
+    } catch (error) {
+      console.error('Error syncing bunq status:', error)
+    }
+  }, [fetchPaymentData])
+
+	const checkAuthStatus = useCallback(async () => {
+		try {
+			const response = await fetch('/api/user/check-auth')
+			if (response.ok) {
+				const data = await response.json()
+				if (data.isLoggedIn) {
+					setIsLoggedIn(true)
+					setUser(data.user)
+				} else {
+					router.push(`/mijn/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+				}
+			} else {
+				router.push(`/mijn/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+			}
+		} catch (error) {
+			console.error('Error checking auth status:', error)
+			router.push(`/mijn/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+		} finally {
+			setIsLoading(false)
+		}
+	}, [router])
+
+	useEffect(() => {
+		checkAuthStatus()
+	}, [checkAuthStatus])
+
+	useEffect(() => {
+		if (isLoggedIn) {
+      syncBunqStatus();
+			fetchPaymentData()
+		}
+	}, [isLoggedIn, syncBunqStatus, fetchPaymentData])
+
+	// Update cooldown timers every second
+	useEffect(() => {
+		const interval = setInterval(() => {
+			setPaymentCooldowns(prev => {
+				const now = Date.now()
+				const updated = { ...prev }
+				let hasChanges = false
+				
+				Object.keys(updated).forEach(key => {
+					const timeDiff = now - updated[key]
+					if (timeDiff >= 10 * 1000) { // 10 seconds
+						delete updated[key]
+						hasChanges = true
+					}
+				})
+				
+				return hasChanges ? updated : prev
+			})
+		}, 1000)
+		
+		return () => clearInterval(interval)
+	}, [])
 
 	const handleLogout = async () => {
 		try {
@@ -267,7 +268,7 @@ export default function BetalingenPage() {
 		const startTime = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`
 		const endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`
 		
-		let details = `🚗 ${dayMonth} ${startTime} - ${endTime} (${reservation.kilometers_driven} km)`
+		const details = `🚗 ${dayMonth} ${startTime} - ${endTime} (${reservation.kilometers_driven} km)`
 		
     // Don't add remarks because of privacy
 		// if (reservation.remarks && reservation.remarks.trim()) {
@@ -294,13 +295,6 @@ export default function BetalingenPage() {
 
 	const sidebarItems = getUserSidebarItems('/mijn/betalingen')
 
-  function getPreviousMonth() {
-    const now = new Date()
-    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const year = previousMonth.getFullYear()
-    const month = String(previousMonth.getMonth() + 1).padStart(2, '0')
-    return `${year}-${month}`
-  }
 
 	return (
 		<AdminLayout

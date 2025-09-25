@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { bunqApi } from '@/lib/bunq-api'
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function GET(): Promise<NextResponse> {
 	try {
 		// Check environment variables
 		const envCheck = {

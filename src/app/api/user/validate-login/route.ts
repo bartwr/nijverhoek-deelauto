@@ -8,14 +8,6 @@ interface ValidateLoginRequest {
 	token: string
 }
 
-interface LoginToken {
-	_id: ObjectId
-	email: string
-	token: string
-	expiresAt: Date
-	used: boolean
-	createdAt: Date
-}
 
 interface UserSession {
 	_id: ObjectId

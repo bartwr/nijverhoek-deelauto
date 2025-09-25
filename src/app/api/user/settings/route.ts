@@ -20,7 +20,7 @@ interface UpdateSettingsRequest {
  * GET /api/user/settings
  * Fetch user settings
  */
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function GET(): Promise<NextResponse> {
 	try {
 		// Check authentication first
 		const cookieStore = await cookies()

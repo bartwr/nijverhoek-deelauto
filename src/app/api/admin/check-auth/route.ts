@@ -1,19 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { connectToDatabase } from '@/lib/mongodb'
-import { ObjectId } from 'mongodb'
 import { cookies } from 'next/headers'
 
-interface AdminSession {
-	_id: ObjectId
-	email: string
-	sessionToken: string
-	expiresAt: Date
-	createdAt: Date
-}
-
-export async function GET(
-	request: NextRequest
-): Promise<NextResponse> {
+export async function GET(): Promise<NextResponse> {
 	try {
 		const cookieStore = await cookies()
 		const sessionToken = cookieStore.get('admin_session')

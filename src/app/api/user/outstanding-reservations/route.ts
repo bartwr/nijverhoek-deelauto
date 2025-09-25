@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { connectToDatabase } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { cookies } from 'next/headers'
 import { Reservation, User, PriceScheme } from '@/types/models'
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function GET(): Promise<NextResponse> {
 	try {
 		// Check authentication first
 		const cookieStore = await cookies()

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { registerBunqServerIp } from '@/lib/bunq-api'
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export async function POST(): Promise<NextResponse> {
 	try {
 		console.log('IP registration request received')
 		
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 	}
 }
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function GET(): Promise<NextResponse> {
 	// Allow GET requests to trigger IP registration as well for easier testing
-	return POST(request)
+	return POST()
 }

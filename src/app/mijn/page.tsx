@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { getUserSidebarItems } from '@/lib/sidebar-utils'
@@ -25,11 +25,7 @@ export default function MijnStartPage() {
 		return `${year}-${month}`
 	}
 
-	useEffect(() => {
-		checkAuthStatus()
-	}, [])
-
-	const checkAuthStatus = async () => {
+	const checkAuthStatus = useCallback(async () => {
 		try {
 			const response = await fetch('/api/user/check-auth')
 			if (response.ok) {
@@ -49,7 +45,11 @@ export default function MijnStartPage() {
 		} finally {
 			setIsLoading(false)
 		}
-	}
+	}, [router])
+
+	useEffect(() => {
+		checkAuthStatus()
+	}, [checkAuthStatus])
 
 	const handleLogout = async () => {
 		try {

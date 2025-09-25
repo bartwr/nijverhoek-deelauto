@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { Reservation, User, PriceScheme } from '@/types/models'
@@ -36,18 +36,7 @@ export default function ReservationsPage() {
 	const [isLoadingPayments, setIsLoadingPayments] = useState(true)
 	const [updatingReservations, setUpdatingReservations] = useState<Set<string>>(new Set())
 
-	useEffect(() => {
-		checkAuthStatus()
-	}, [])
-
-	useEffect(() => {
-		if (isLoggedIn) {
-			fetchReservations()
-			fetchPayments()
-		}
-	}, [yearmonth, isLoggedIn])
-
-	const checkAuthStatus = async () => {
+	const checkAuthStatus = useCallback(async () => {
 		try {
 			const response = await fetch('/api/user/check-auth')
 			if (response.ok) {
@@ -65,9 +54,9 @@ export default function ReservationsPage() {
 			console.error('Error checking auth status:', error)
 			router.push(`/mijn/login?redirect=${encodeURIComponent(window.location.pathname)}`)
 		}
-	}
+	}, [router])
 
-	const fetchReservations = async () => {
+	const fetchReservations = useCallback(async () => {
 		try {
 			setIsLoading(true)
 			setError('')
@@ -86,7 +75,18 @@ export default function ReservationsPage() {
 		} finally {
 			setIsLoading(false)
 		}
-	}
+	}, [yearmonth])
+
+	useEffect(() => {
+		checkAuthStatus()
+	}, [checkAuthStatus])
+
+	useEffect(() => {
+		if (isLoggedIn) {
+			fetchReservations()
+			fetchPayments()
+		}
+	}, [yearmonth, isLoggedIn, fetchReservations])
 
 	const fetchPayments = async () => {
 		try {

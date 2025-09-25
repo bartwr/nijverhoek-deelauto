@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { getUserSidebarItems } from '@/lib/sidebar-utils'
@@ -23,11 +23,19 @@ export default function InstellingenPage() {
 	const [saveMessage, setSaveMessage] = useState<string | null>(null)
 	const router = useRouter()
 
-	useEffect(() => {
-		checkAuthStatus()
+	const fetchUserSettings = useCallback(async () => {
+		try {
+			const response = await fetch('/api/user/settings')
+			if (response.ok) {
+				const data = await response.json()
+				setSettings(data.settings || {})
+			}
+		} catch (error) {
+			console.error('Error fetching user settings:', error)
+		}
 	}, [])
 
-	const checkAuthStatus = async () => {
+	const checkAuthStatus = useCallback(async () => {
 		try {
 			const response = await fetch('/api/user/check-auth')
 			if (response.ok) {
@@ -48,19 +56,11 @@ export default function InstellingenPage() {
 		} finally {
 			setIsLoading(false)
 		}
-	}
+	}, [router, fetchUserSettings])
 
-	const fetchUserSettings = async () => {
-		try {
-			const response = await fetch('/api/user/settings')
-			if (response.ok) {
-				const data = await response.json()
-				setSettings(data.settings || {})
-			}
-		} catch (error) {
-			console.error('Error fetching user settings:', error)
-		}
-	}
+	useEffect(() => {
+		checkAuthStatus()
+	}, [checkAuthStatus])
 
 	const handleLogout = async () => {
 		try {

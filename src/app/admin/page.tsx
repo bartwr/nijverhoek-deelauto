@@ -84,7 +84,7 @@ export default function AdminPage() {
 			} else {
 				setMessage(data.error || 'Failed to send login email')
 			}
-		} catch (error) {
+		} catch {
 			setMessage('An error occurred. Please try again.')
 		} finally {
 			setIsLoading(false)

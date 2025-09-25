@@ -1,23 +1,48 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 function UserLoginContent() {
 	const [email, setEmail] = useState('')
 	const [isLoading, setIsLoading] = useState(false)
 	const [message, setMessage] = useState('')
-	const [token, setToken] = useState('')
 	const router = useRouter()
 	const searchParams = useSearchParams()
+
+	const handleTokenLogin = useCallback(async (token: string) => {
+		setIsLoading(true)
+		try {
+			const response = await fetch('/api/user/validate-login', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ token }),
+			})
+
+			const data = await response.json()
+
+			if (response.ok) {
+				setMessage('Succesvol ingelogd! Dashboard wordt geladen...')
+				const redirectUrl = searchParams.get('redirect') || `/mijn/betalingen`
+				router.push(redirectUrl)
+			} else {
+				setMessage(data.error || 'Invalid login token')
+			}
+		} catch {
+			setMessage('An error occurred. Please try again.')
+		} finally {
+			setIsLoading(false)
+		}
+	}, [router, searchParams])
 
 	useEffect(() => {
 		const tokenParam = searchParams.get('token')
 		if (tokenParam) {
-			setToken(tokenParam)
 			handleTokenLogin(tokenParam)
 		}
-	}, [searchParams])
+	}, [searchParams, handleTokenLogin])
 
 	const handleEmailLogin = async (e: React.FormEvent) => {
 		e.preventDefault()
@@ -44,41 +69,13 @@ function UserLoginContent() {
 			} else {
 				setMessage(data.error || 'Failed to send login email')
 			}
-		} catch (error) {
+		} catch {
 			setMessage('An error occurred. Please try again.')
 		} finally {
 			setIsLoading(false)
 		}
 	}
 
-	const handleTokenLogin = async (token: string) => {
-		setIsLoading(true)
-		setMessage('')
-
-		try {
-			const response = await fetch('/api/user/validate-login', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({ token })
-			})
-
-			const data = await response.json()
-
-			if (response.ok) {
-				setMessage('Succesvol ingelogd! Dashboard wordt geladen...')
-				const redirectUrl = searchParams.get('redirect') || `/mijn/betalingen`
-				router.push(redirectUrl)
-			} else {
-				setMessage(data.error || 'Invalid login token')
-			}
-		} catch (error) {
-			setMessage('An error occurred. Please try again.')
-		} finally {
-			setIsLoading(false)
-		}
-	}
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-[#ea5c33]/5 via-white to-[#ea5c33]/5 dark:from-[#ea5c33]/10 dark:via-gray-900 dark:to-[#ea5c33]/10 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
