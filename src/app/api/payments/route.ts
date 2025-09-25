@@ -1,11 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectToDatabase } from '@/lib/mongodb'
 import { CreatePaymentRequest, PaymentResponse, Payment } from '@/types/payment'
+import { User } from '@/types/models'
 import { createBunqPaymentRequest } from '@/lib/bunq-api'
 import { syncAllBunqStatuses } from '@/lib/payment-utils'
+import { cookies } from 'next/headers'
 
 export async function POST(request: NextRequest): Promise<NextResponse<PaymentResponse>> {
 	try {
+		// Check authentication first
+		const cookieStore = await cookies()
+		const sessionToken = cookieStore.get('user_session')
+
+		if (!sessionToken) {
+			return NextResponse.json(
+				{
+					success: false,
+					error: 'Authentication required'
+				},
+				{ status: 401 }
+			)
+		}
+
+		const { db } = await connectToDatabase()
+
+		// Validate session
+		const session = await db.collection('UserSessions').findOne({
+			sessionToken: sessionToken.value,
+			expiresAt: { $gt: new Date() }
+		})
+
+		if (!session) {
+			return NextResponse.json(
+				{
+					success: false,
+					error: 'Session expired'
+				},
+				{ status: 401 }
+			)
+		}
+
+		// Find user by email
+		const user = await db.collection<User>('Users').findOne({
+			email_address: session.email
+		})
+
+		if (!user) {
+			return NextResponse.json(
+				{
+					success: false,
+					error: 'User not found'
+				},
+				{ status: 404 }
+			)
+		}
+
 		const body: CreatePaymentRequest = await request.json()
 
 		// Validate required fields
@@ -44,14 +93,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
 		// Round to 2 decimal places
 		const roundedAmount = Math.round(body.amount_in_euros * 100) / 100
 
-		const { db } = await connectToDatabase()
-
 		// Check if there's already a valid payment for the same reservations
 		if (body.reservations_paid && body.reservations_paid.length > 0) {
 			// Only reuse payments created within the last 7 days to avoid expired URLs
 			const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 			
 			const existingPayment = await db.collection('Payments').findOne({
+				user_id: user._id!.toString(), // Only check payments from the same user
 				reservations_paid: { $all: body.reservations_paid },
 				is_business_transaction: body.is_business_transaction,
 				amount_in_euros: roundedAmount,
@@ -117,6 +165,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
 		// Create payment document
 		const payment = {
 			datetime_created: new Date(),
+			user_id: user._id!.toString(), // Store the user ID who initiated the payment
 			title: body.title,
 			description: body.description,
 			amount_in_euros: roundedAmount,

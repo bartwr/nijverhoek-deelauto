@@ -5,6 +5,7 @@ import { useState } from 'react'
 interface Payment {
 	_id?: string
 	datetime_created: Date
+	user_id: string
 	title: string
 	description: string
 	amount_in_euros: number

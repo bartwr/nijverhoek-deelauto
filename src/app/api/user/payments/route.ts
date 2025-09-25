@@ -51,9 +51,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 			console.warn('Background bunq status sync failed:', error)
 		})
 
-		// Fetch completed payments (where paid_at is not null)
+		// Fetch completed payments (where paid_at is not null) for this user only
 		const completedPayments = await db.collection('Payments')
 			.find({ 
+				user_id: user._id!.toString(), // Only show payments from this user
 				paid_at: { $ne: null }
 			})
 			.sort({ paid_at: -1 })

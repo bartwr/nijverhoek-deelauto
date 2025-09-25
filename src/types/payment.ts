@@ -1,6 +1,7 @@
 export interface Payment {
 	_id?: string
 	datetime_created: Date
+	user_id: string // ID of the user who initiated the payment
 	title: string
 	description: string
 	amount_in_euros: number
