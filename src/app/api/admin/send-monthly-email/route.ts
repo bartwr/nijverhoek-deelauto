@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 			to,
 			subject,
 			html,
-			text: `Er staat een nieuwe betaling voor je klaar. Ga naar https://auto.nijverhoek.nl/mijn/betalingen om in te loggen.`
+			text: `Er staat een nieuw betaalverzoek voor je klaar. Ga naar https://auto.nijverhoek.nl/mijn/betalingen om in te loggen.`
 		})
 
 		if (success) {

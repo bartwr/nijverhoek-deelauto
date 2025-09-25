@@ -19,7 +19,7 @@ export default function AdminPage() {
 	const [isSyncing, setIsSyncing] = useState(false)
 	const [showEmailForm, setShowEmailForm] = useState(false)
 	const [emailTo, setEmailTo] = useState('')
-	const [emailSubject, setEmailSubject] = useState('Deelauto Nijverhoek - Maand augustus 2025')
+	const [emailSubject, setEmailSubject] = useState('Deelauto Nijverhoek - Maand september 2025')
 	const [emailBody, setEmailBody] = useState(`<!DOCTYPE html>
 <html>
 <head>
@@ -27,8 +27,8 @@ export default function AdminPage() {
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
 	<div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-		<h1 style="color: #f97316;">Deelauto Nijverhoek - Augustus 2025</h1>
-		<p>Er staat een nieuwe betaling voor je klaar voor augustus 2025.</p>
+		<h1 style="color: #f97316;">Deelauto Nijverhoek - September 2025</h1>
+		<p>Er staat een nieuw betaalverzoek voor je klaar voor september 2025.</p>
 		<div style="margin: 30px 0;">
 			<a href="\${loginUrl}" style="background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Open betaaloverzicht</a>
 		</div>
