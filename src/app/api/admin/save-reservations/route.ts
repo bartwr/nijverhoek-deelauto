@@ -133,11 +133,15 @@ export async function POST(
 		// Insert all reservations
 		const result = await db.collection<Reservation>('Reservations').insertMany(processedReservations)
 
+		// Convert user IDs to strings for JSON response
+		const userIds = Array.from(processedUsers.values()).map(id => id.toString())
+
 		return NextResponse.json({
 			success: true,
 			message: `${result.insertedCount} reserveringen succesvol opgeslagen`,
 			insertedCount: result.insertedCount,
-			usersCreated: processedUsers.size
+			usersCreated: processedUsers.size,
+			userIds: userIds
 		})
 
 	} catch (error) {
