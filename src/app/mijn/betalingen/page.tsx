@@ -269,9 +269,10 @@ export default function BetalingenPage() {
 		
 		let details = `🚗 ${dayMonth} ${startTime} - ${endTime} (${reservation.kilometers_driven} km)`
 		
-		if (reservation.remarks && reservation.remarks.trim()) {
-			details += `\n🏷️ ${reservation.remarks.trim()}`
-		}
+    // Don't add remarks because of privacy
+		// if (reservation.remarks && reservation.remarks.trim()) {
+		// 	details += `\n🏷️ ${reservation.remarks.trim()}`
+		// }
 		
 		return details
 	}

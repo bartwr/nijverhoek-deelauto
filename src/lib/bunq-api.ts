@@ -675,7 +675,36 @@ class BunqApiClient {
 			return response
 		}
 		
-		throw new Error('BunqMeTab has no entries')
+		// Handle BunqMeTabs with no entries - this can happen if the tab was created but has no active entries
+		// In this case, we'll check if the tab has expired and return appropriate status
+		let status = 'PENDING'
+		
+		// Check if the tab has expired
+		if (tabDetails.time_expiry) {
+			const expiryDate = new Date(tabDetails.time_expiry)
+			const now = new Date()
+			if (now > expiryDate) {
+				status = 'CANCELLED' // Expired tabs are considered cancelled
+			}
+		}
+		
+		// Return a response with minimal information since we don't have tab entry details
+		const response: BunqPaymentResponse = {
+			id: tabDetails.id,
+			created: tabDetails.created,
+			updated: tabDetails.updated,
+			time_expiry: tabDetails.time_expiry,
+			monetary_account_id: tabDetails.monetary_account_id,
+			amount_inquired: {
+				value: '0.00',
+				currency: 'EUR'
+			},
+			description: 'BunqMeTab with no entries',
+			bunqme_share_url: tabDetails.bunqme_tab_share_url,
+			status: status
+		}
+		
+		return response
 	}
 
 	/**
