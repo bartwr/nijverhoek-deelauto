@@ -313,7 +313,7 @@ export default function ReservationsPage() {
 		return null // Will redirect to login
 	}
 
-  console.log('reservation',reservations);
+  console.log('reservations',reservations);
 
 	return (
 		<AdminLayout
@@ -427,7 +427,7 @@ export default function ReservationsPage() {
                           </div>
                         </details>
                         </p>
-												<p>Kilometers: {reservation.kilometers_driven} km = {formatCurrency(calculateKilometerCosts(
+												<p>Kilometers: {reservation.kilometers_driven?.toFixed(2)} km = {formatCurrency(calculateKilometerCosts(
 													reservation.kilometers_driven,
 													reservation.priceScheme
 												))}<br />
