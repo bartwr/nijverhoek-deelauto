@@ -202,6 +202,36 @@ export default function ReservationsPage() {
 		})
 	}
 
+	const formatReservationDate = (startDate: Date, endDate: Date) => {
+		const start = new Date(startDate)
+		const end = new Date(endDate)
+		
+		// Check if it's the same day
+		if (start.toDateString() === end.toDateString()) {
+			return formatDate(start)
+		}
+		
+		// Check if it's multi-day
+		const startMonth = start.getMonth()
+		const startYear = start.getFullYear()
+		const endMonth = end.getMonth()
+		const endYear = end.getFullYear()
+		
+		// If same month and year: "dd- t/m dd-mm-yyyy"
+		if (startMonth === endMonth && startYear === endYear) {
+			const startDay = start.toLocaleDateString('nl-NL', { day: '2-digit' })
+			const endFormatted = end.toLocaleDateString('nl-NL', {
+				day: '2-digit',
+				month: '2-digit',
+				year: 'numeric'
+			})
+			return `${startDay}- t/m ${endFormatted}`
+		}
+		
+		// If different months: "dd-mm-yyyy t/m dd-mm-yyyy"
+		return `${formatDate(start)} t/m ${formatDate(end)}`
+	}
+
 	const formatTime = (date: Date) => {
 		return new Date(date).toLocaleTimeString('nl-NL', {
 			hour: '2-digit',
@@ -283,6 +313,8 @@ export default function ReservationsPage() {
 		return null // Will redirect to login
 	}
 
+  console.log('reservation',reservations);
+
 	return (
 		<AdminLayout
 			title="Deelauto Nijverhoek"
@@ -357,7 +389,10 @@ export default function ReservationsPage() {
 										</svg>
 										<div>
 											<h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-												{formatDate(new Date(reservation.reservation_start))}
+												{formatReservationDate(
+													new Date(reservation.reservation_start),
+													new Date(reservation.effective_end > reservation.reservation_end ? reservation.effective_end : reservation.reservation_end)
+												)}
 											</h3>
 											<p className="text-sm text-gray-600 dark:text-gray-300">
 												{formatTime(new Date(reservation.reservation_start))} - {formatTime(new Date(reservation.effective_end > reservation.reservation_end ? reservation.effective_end : reservation.reservation_end))}
