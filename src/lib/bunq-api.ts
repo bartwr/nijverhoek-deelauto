@@ -657,7 +657,9 @@ class BunqApiClient {
 	 * Get BunqMeTab status by checking for payments in result_inquiries
 	 */
 	async getBunqMeTabStatus(tabId: number): Promise<BunqPaymentResponse> {
+    console.log('Getting BunqMeTab status');
 		const tabDetails = await this.getBunqMeTabDetails(tabId)
+    console.log('BunqMeTab details:', JSON.stringify(tabDetails, null, 2))
 		
 		// BunqMeTab status is determined by checking result_inquiries
 		// If there are payments, we need to check their status
@@ -766,6 +768,7 @@ class BunqApiClient {
 
 		// If we know it's a BunqMeTab, use the appropriate method
 		if (isBunqUserRequest === false) {
+      console.log('Checking BunqMeTab status');
 			return await this.getBunqMeTabStatus(requestId)
 		}
 		
@@ -954,6 +957,7 @@ export async function createBunqPaymentRequest(
  */
 export async function checkBunqPaymentStatus(requestId: number, isBunqUserRequest?: boolean): Promise<string> {
 	try {
+		console.log('Checking Bunq payment status');
 		const response = await bunqApi.checkPaymentRequestStatus(requestId, isBunqUserRequest)
 		console.log('Bunq payment status check response:', JSON.stringify(response, null, 2))
 		
