@@ -60,6 +60,21 @@ export interface BunqMeTabResponse {
 		}
 		description: string
 		redirect_url?: string
+	} | {
+		amount_inquired: {
+			value: string
+			currency: string
+		}
+		description: string
+		redirect_url?: string
+	}[]
+	bunqme_tab_entries?: {
+		amount_inquired: {
+			value: string
+			currency: string
+		}
+		description: string
+		redirect_url?: string
 	}[]
 	result_inquiries?: {
 		id: number
@@ -663,8 +678,13 @@ class BunqApiClient {
 		
 		// BunqMeTab status is determined by checking result_inquiries
 		// If there are payments, we need to check their status
-		if (tabDetails.bunqme_tab_entry && tabDetails.bunqme_tab_entry.length > 0) {
-			const tabEntry = tabDetails.bunqme_tab_entry[0]
+		// Handle both single entry (object) and multiple entries (array)
+		const tabEntries = Array.isArray(tabDetails.bunqme_tab_entry) 
+			? tabDetails.bunqme_tab_entry 
+			: tabDetails.bunqme_tab_entries || []
+		
+		if (tabEntries.length > 0) {
+			const tabEntry = tabEntries[0]
 			
 			// Check if there are any payments made to this tab by examining result_inquiries
 			let status = 'PENDING'
