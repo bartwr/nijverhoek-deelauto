@@ -208,7 +208,11 @@ export default function ReservationsPage() {
 		
 		// Check if it's the same day
 		if (start.toDateString() === end.toDateString()) {
-			return formatDate(start)
+			return start.toLocaleDateString('nl-NL', {
+				day: 'numeric',
+				month: 'long',
+				year: 'numeric'
+			})
 		}
 		
 		// Check if it's multi-day
@@ -217,19 +221,28 @@ export default function ReservationsPage() {
 		const endMonth = end.getMonth()
 		const endYear = end.getFullYear()
 		
-		// If same month and year: "dd- t/m dd-mm-yyyy"
+		// If same month and year: "3 t/m 4 september 2025"
 		if (startMonth === endMonth && startYear === endYear) {
-			const startDay = start.toLocaleDateString('nl-NL', { day: '2-digit' })
-			const endFormatted = end.toLocaleDateString('nl-NL', {
-				day: '2-digit',
-				month: '2-digit',
+			const startDay = start.getDate()
+			const endDay = end.getDate()
+			const monthYear = end.toLocaleDateString('nl-NL', {
+				month: 'long',
 				year: 'numeric'
 			})
-			return `${startDay}- t/m ${endFormatted}`
+			return `${startDay} t/m ${endDay} ${monthYear}`
 		}
 		
-		// If different months: "dd-mm-yyyy t/m dd-mm-yyyy"
-		return `${formatDate(start)} t/m ${formatDate(end)}`
+		// If different months: "30 augustus t/m 1 september 2025"
+		const startFormatted = start.toLocaleDateString('nl-NL', {
+			day: 'numeric',
+			month: 'long'
+		})
+		const endFormatted = end.toLocaleDateString('nl-NL', {
+			day: 'numeric',
+			month: 'long',
+			year: 'numeric'
+		})
+		return `${startFormatted} t/m ${endFormatted}`
 	}
 
 	const formatTime = (date: Date) => {
