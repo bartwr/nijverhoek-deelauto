@@ -1,10 +1,12 @@
-const CACHE_NAME = 'deelauto-nijverhoek-v2'
+const CACHE_NAME = 'deelauto-nijverhoek-v3'
 const urlsToCache = [
   '/',
   '/manifest.json',
   '/offline',
   '/icons/web-app-manifest-192x192.png',
-  '/icons/web-app-manifest-512x512.png'
+  '/icons/web-app-manifest-512x512.png',
+  '/_next/static/css/',
+  '/globals.css'
 ]
 
 // Install event - cache resources
