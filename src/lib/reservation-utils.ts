@@ -409,50 +409,65 @@ function getMultiDayBreakdown(
 		const dayStr = formatDate(dayStart)
 		let remainingHours = MAX_DAILY_HOURS
 		
-		// Determine the time periods for this day
-		const dayParts: string[] = []
-		
-		// 1. Handle start reservation period (if any)
-		if (dayHours.startReserved > 0 && remainingHours > 0) {
-			const startHoursToCharge = Math.min(dayHours.startReserved, remainingHours)
-			const rateStr = formatCurrency(priceScheme.costs_per_unused_reserved_hour_start_trip)
-			
-			// Determine start and end times for this period
-			const periodStart = new Date(Math.max(reservedStart.getTime(), dayStart.getTime()))
-			
-			const description = `${dayStr}: Start reservering ${formatTime(periodStart)} t/m einde dag: ${startHoursToCharge.toFixed(1)}u × ${rateStr}/u`
-			dayParts.push(description)
-			remainingHours -= startHoursToCharge
-		}
-		
-		// 2. Handle effective usage period (if any)
-		if (dayHours.effective > 0 && remainingHours > 0) {
-			const effectiveHoursToCharge = Math.min(dayHours.effective, remainingHours)
+		// Apply the same priority logic as the original calculation
+		// 1. First, charge effective hours (highest priority)
+		const effectiveHoursToCharge = Math.min(dayHours.effective, remainingHours)
+		remainingHours -= effectiveHoursToCharge
+
+		// 2. Then charge start reservation hours if there's remaining capacity
+		const startHoursToCharge = remainingHours > 0 ? Math.min(dayHours.startReserved, remainingHours) : 0
+		remainingHours -= startHoursToCharge
+
+		// 3. Finally charge end reservation hours if there's still remaining capacity
+		const endHoursToCharge = remainingHours > 0 ? Math.min(dayHours.endReserved, remainingHours) : 0
+
+		// Now create the display strings
+		// Combine start reservation and effective usage into one line if both exist on the same day
+		if (effectiveHoursToCharge > 0 || startHoursToCharge > 0) {
 			const rateStr = formatCurrency(priceScheme.costs_per_effective_hour)
+			const displayHours = effectiveHoursToCharge + startHoursToCharge
 			
-			// Determine start and end times for this period
-			const periodStart = new Date(Math.max(effectiveStart.getTime(), dayStart.getTime()))
-			const periodEnd = new Date(Math.min(effectiveEnd.getTime(), dayEnd.getTime()))
-			
+			// Determine the time range for the combined period
 			let description: string
-			if (periodStart.getTime() === dayStart.getTime()) {
-				// Started at beginning of day
-				description = `${dayStr}: Gebruik 00:00 t/m einde gebruik ${formatTime(periodEnd)}: ${effectiveHoursToCharge.toFixed(1)}u × ${rateStr}/u`
-			} else if (periodEnd.getTime() >= dayEnd.getTime() - 1000) {
-				// Ended at end of day
-				description = `${dayStr}: Start reservering ${formatTime(periodStart)} t/m einde dag: ${effectiveHoursToCharge.toFixed(1)}u × ${rateStr}/u`
+			
+			if (dayHours.startReserved > 0 && dayHours.effective > 0) {
+				// Both start reservation and effective usage on this day
+				const periodStart = new Date(Math.max(reservedStart.getTime(), dayStart.getTime()))
+				const periodEnd = new Date(Math.min(effectiveEnd.getTime(), dayEnd.getTime()))
+				
+				if (periodEnd.getTime() >= dayEnd.getTime() - 1000) {
+					// Ended at end of day
+					description = `${dayStr}: Start reservering ${formatTime(periodStart)} t/m einde dag: ${displayHours.toFixed(1)}u × ${rateStr}/u`
+				} else {
+					// Ended within the day
+					description = `${dayStr}: Start reservering ${formatTime(periodStart)} t/m einde gebruik ${formatTime(periodEnd)}: ${displayHours.toFixed(1)}u × ${rateStr}/u`
+				}
+			} else if (dayHours.startReserved > 0) {
+				// Only start reservation on this day
+				const periodStart = new Date(Math.max(reservedStart.getTime(), dayStart.getTime()))
+				description = `${dayStr}: Start reservering ${formatTime(periodStart)} t/m einde dag: ${displayHours.toFixed(1)}u × ${rateStr}/u`
 			} else {
-				// Started and ended within the day
-				description = `${dayStr}: Gebruik ${formatTime(periodStart)} t/m einde gebruik ${formatTime(periodEnd)}: ${effectiveHoursToCharge.toFixed(1)}u × ${rateStr}/u`
+				// Only effective usage on this day
+				const periodStart = new Date(Math.max(effectiveStart.getTime(), dayStart.getTime()))
+				const periodEnd = new Date(Math.min(effectiveEnd.getTime(), dayEnd.getTime()))
+				
+				if (periodStart.getTime() === dayStart.getTime()) {
+					// Started at beginning of day
+					description = `${dayStr}: Gebruik 00:00 t/m einde gebruik ${formatTime(periodEnd)}: ${displayHours.toFixed(1)}u × ${rateStr}/u`
+				} else if (periodEnd.getTime() >= dayEnd.getTime() - 1000) {
+					// Ended at end of day
+					description = `${dayStr}: Start reservering ${formatTime(periodStart)} t/m einde dag: ${displayHours.toFixed(1)}u × ${rateStr}/u`
+				} else {
+					// Started and ended within the day
+					description = `${dayStr}: Gebruik ${formatTime(periodStart)} t/m einde gebruik ${formatTime(periodEnd)}: ${displayHours.toFixed(1)}u × ${rateStr}/u`
+				}
 			}
 			
-			dayParts.push(description)
-			remainingHours -= effectiveHoursToCharge
+			parts.push(description)
 		}
 		
-		// 3. Handle end reservation period (if any)
-		if (dayHours.endReserved > 0 && remainingHours > 0) {
-			const endHoursToCharge = Math.min(dayHours.endReserved, remainingHours)
+		// Handle end reservation period separately (if any)
+		if (endHoursToCharge > 0) {
 			const rateStr = formatCurrency(priceScheme.costs_per_unused_reserved_hour_end_trip)
 			
 			// Determine start and end times for this period
@@ -460,11 +475,8 @@ function getMultiDayBreakdown(
 			const periodEnd = new Date(Math.min(reservedEnd.getTime(), dayEnd.getTime()))
 			
 			const description = `${dayStr}: Einde gebruik ${formatTime(periodStart)} t/m einde reservering ${formatTime(periodEnd)}: ${endHoursToCharge.toFixed(1)}u × ${rateStr}/u`
-			dayParts.push(description)
+			parts.push(description)
 		}
-		
-		// Add all parts for this day
-		parts.push(...dayParts)
 		
 		// Move to next day
 		currentDate.setDate(currentDate.getDate() + 1)
