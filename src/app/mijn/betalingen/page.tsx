@@ -278,6 +278,259 @@ export default function BetalingenPage() {
 		return details
 	}
 
+	const handleOpenReceipt = async (paymentId: string) => {
+		try {
+			// Fetch receipt data
+			const response = await fetch(`/api/payments/${paymentId}/receipt`)
+			if (!response.ok) {
+				const errorData = await response.json()
+				alert(`Fout bij ophalen bon: ${errorData.error}`)
+				return
+			}
+
+			const result = await response.json()
+			if (!result.success) {
+				alert(`Fout bij ophalen bon: ${result.error}`)
+				return
+			}
+
+			// Open new window
+			const receiptWindow = window.open('', '_blank', 'width=800,height=1000,scrollbars=yes,resizable=yes')
+			if (!receiptWindow) {
+				alert('Kon geen nieuw venster openen. Controleer of pop-ups zijn toegestaan.')
+				return
+			}
+
+			// Create the HTML content for the receipt window
+			const receiptHtml = `
+				<!DOCTYPE html>
+				<html lang="nl">
+				<head>
+					<meta charset="UTF-8">
+					<meta name="viewport" content="width=device-width, initial-scale=1.0">
+					<title>Bon - ${result.data.payment.title}</title>
+					<style>
+						body {
+							margin: 0;
+							padding: 20px;
+							font-family: Arial, sans-serif;
+							background-color: #f5f5f5;
+						}
+						.print-button {
+							position: fixed;
+							top: 20px;
+							right: 20px;
+							background-color: #ea5c33;
+							color: white;
+							border: none;
+							padding: 10px 20px;
+							border-radius: 5px;
+							cursor: pointer;
+							font-size: 14px;
+							z-index: 1000;
+						}
+						.print-button:hover {
+							background-color: #d54d2a;
+						}
+						@media print {
+							body {
+								background-color: white;
+								padding: 0;
+							}
+							.print-button {
+								display: none;
+							}
+						}
+					</style>
+				</head>
+				<body>
+					<button class="print-button" onclick="window.print()">🖨️ Afdrukken</button>
+					<div id="receipt-root"></div>
+					<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+					<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+				</body>
+				</html>
+			`
+
+			receiptWindow.document.write(receiptHtml)
+			receiptWindow.document.close()
+
+			// Wait for the window to load, then render the React component
+			receiptWindow.onload = () => {
+				const receiptRoot = receiptWindow.document.getElementById('receipt-root')
+				if (receiptRoot) {
+					// Create a simple HTML version since we can't easily use React in the new window
+					receiptRoot.innerHTML = createReceiptHTML(result.data)
+				}
+			}
+		} catch (error) {
+			console.error('Error opening receipt:', error)
+			alert('Er is een fout opgetreden bij het openen van de bon.')
+		}
+	}
+
+	interface ReceiptData {
+		payment: Payment
+		reservations: Array<Reservation & { user: User; priceScheme?: PriceScheme }>
+		user: User
+	}
+
+	const createReceiptHTML = (data: ReceiptData) => {
+		const { payment, reservations, user } = data
+
+		const formatDateTime = (date: string | Date) => {
+			const d = new Date(date)
+			return d.toLocaleDateString('nl-NL', {
+				year: 'numeric',
+				month: '2-digit',
+				day: '2-digit',
+				hour: '2-digit',
+				minute: '2-digit'
+			})
+		}
+
+		const formatAmount = (amount: number) => {
+			return `€ ${amount.toFixed(2).replace('.', ',')}`
+		}
+
+		const calculateReservationCosts = (reservation: Reservation & { user: User; priceScheme?: PriceScheme }) => {
+			const priceScheme = reservation.priceScheme
+			if (!priceScheme) {
+				return {
+					totalTimeCosts: formatAmount(0),
+					totalKilometersCosts: formatAmount(0)
+				}
+			}
+
+			// Calculate kilometer costs (simple)
+			const kilometersCosts = reservation.kilometers_driven * priceScheme.costs_per_kilometer
+			
+			// Calculate time costs by subtracting kilometer costs from total
+			// This ensures the breakdown always adds up to the actual total
+			const timeCosts = reservation.total_costs - kilometersCosts
+
+			return {
+				totalTimeCosts: formatAmount(timeCosts),
+				totalKilometersCosts: formatAmount(kilometersCosts)
+			}
+		}
+
+		const reservationsHTML = reservations.map((reservation: Reservation & { user: User; priceScheme?: PriceScheme }, index: number) => {
+			const costs = calculateReservationCosts(reservation)
+			const startDate = formatDateTime(reservation.effective_start)
+			const endDate = formatDateTime(reservation.effective_end)
+			
+			return `
+				<div>
+					<div style="margin-bottom: 15px;">
+						<p style="margin: 0 0 8px 0; font-weight: bold; font-size: 12pt;">
+							Rit in Kia e-Niro van ${startDate} tot ${endDate}
+						</p>
+						
+						${reservation.remarks && reservation.remarks.trim() ? `
+							<p style="margin: 0 0 5px 0; padding-left: 10px;">
+								- Notitie: ${reservation.remarks.trim()}
+							</p>
+						` : ''}
+						
+						<p style="margin: 0 0 5px 0; padding-left: 10px;">
+							- Uren: ${costs.totalTimeCosts}
+						</p>
+						
+						<p style="margin: 0 0 5px 0; padding-left: 10px;">
+							- Kilometers: ${costs.totalKilometersCosts}
+						</p>
+						
+						<p style="margin: 0 0 15px 0; padding-left: 10px; font-weight: bold;">
+							Rittotaal: ${formatAmount(reservation.total_costs)}
+						</p>
+					</div>
+					
+					${index < reservations.length - 1 ? `
+						<hr style="border: none; border-top: 1px solid #ccc; margin: 15px 0;" />
+					` : ''}
+				</div>
+			`
+		}).join('')
+
+		return `
+			<div style="width: 210mm; min-height: 297mm; margin: 0 auto; padding: 20mm; background-color: white; font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.4; color: #000;">
+				<!-- Header -->
+				<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #ea5c33; padding-bottom: 15px;">
+					<div>
+						<h1 style="font-size: 18pt; font-weight: bold; color: #ea5c33; margin: 0 0 5px 0;">
+							Deelauto Nijverhoek
+						</h1>
+						<p style="margin: 0; font-size: 10pt; color: #666;">
+							Bon
+						</p>
+					</div>
+					<div style="text-align: right;">
+						<p style="margin: 0 0 5px 0; font-weight: bold;">
+							${user.name}
+						</p>
+						<p style="margin: 0; font-size: 10pt; color: #666;">
+							${user.email_address}
+						</p>
+					</div>
+				</div>
+
+				<!-- Payment Info -->
+				<div style="margin-bottom: 30px;">
+					<h2 style="font-size: 14pt; font-weight: bold; margin: 0 0 10px 0; color: #333;">
+						Betalingsgegevens
+					</h2>
+					<p style="margin: 0 0 5px 0;">
+						<strong>Betaling:</strong> ${payment.title}
+					</p>
+					<p style="margin: 0 0 5px 0;">
+						<strong>Type:</strong> ${payment.is_business_transaction ? 'Zakelijk' : 'Privé'}
+					</p>
+					${payment.paid_at ? `
+						<p style="margin: 0 0 5px 0;">
+							<strong>Betaald op:</strong> ${formatDateTime(payment.paid_at)}
+						</p>
+					` : ''}
+				</div>
+
+				<!-- Reservations -->
+				<div style="margin-bottom: 30px;">
+					<h2 style="font-size: 14pt; font-weight: bold; margin: 0 0 15px 0; color: #333;">
+						Ritten
+					</h2>
+					${reservationsHTML}
+				</div>
+
+				<!-- Total -->
+				<div style="border-top: 2px solid #333; padding-top: 15px; margin-top: 30px;">
+					<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+						<span>Totaal exclusief BTW</span>
+						<span style="font-weight: bold;">
+							${formatAmount(payment.amount_in_euros)}
+						</span>
+					</div>
+					
+					<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+						<span>BTW 0%</span>
+						<span>€ 0,00</span>
+					</div>
+					
+					<div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #333; padding-top: 10px; margin-top: 10px; font-size: 14pt; font-weight: bold;">
+						<span>Totaal inclusief BTW</span>
+						<span>${formatAmount(payment.amount_in_euros)}</span>
+					</div>
+				</div>
+
+				<!-- Footer -->
+				<div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 10pt; color: #666; text-align: center;">
+					<p style="margin: 0;">
+						Deelauto Nijverhoek - Duurzaam delen, samen vooruit
+					</p>
+				</div>
+			</div>
+		`
+	}
+
 	if (isLoading) {
 		return (
 			<div className="min-h-screen bg-gradient-to-br from-[#ea5c33]/5 via-white to-[#ea5c33]/5 dark:from-[#ea5c33]/10 dark:via-gray-900 dark:to-[#ea5c33]/10 flex items-center justify-center">
@@ -475,6 +728,15 @@ export default function BetalingenPage() {
 												<p className="font-bold text-xl text-gray-900 dark:text-gray-100">
 													{formatAmount(payment.amount_in_euros)}
 												</p>
+												<button
+													onClick={() => handleOpenReceipt(payment._id!)}
+													className="mt-2 bg-[#ea5c33] hover:bg-[#ea5c33]/90 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer shadow-lg hover:shadow-xl flex items-center space-x-2"
+												>
+													<svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+														<path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+													</svg>
+													<span>Bon</span>
+												</button>
 											</div>
 										</div>
 									</div>

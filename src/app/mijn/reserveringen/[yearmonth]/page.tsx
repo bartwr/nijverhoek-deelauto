@@ -194,14 +194,6 @@ export default function ReservationsPage() {
 		}
 	}
 
-	const formatDate = (date: Date) => {
-		return new Date(date).toLocaleDateString('nl-NL', {
-			day: '2-digit',
-			month: '2-digit',
-			year: 'numeric'
-		})
-	}
-
 	const formatReservationDate = (startDate: Date, endDate: Date) => {
 		const start = new Date(startDate)
 		const end = new Date(endDate)
