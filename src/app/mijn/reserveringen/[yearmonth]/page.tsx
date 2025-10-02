@@ -252,6 +252,22 @@ export default function ReservationsPage() {
 		})
 	}
 
+	const formatTimeWithDate = (startDate: Date, endDate: Date) => {
+		const start = new Date(startDate)
+		const end = new Date(endDate)
+		
+		// Check if it's the same day
+		if (start.toDateString() === end.toDateString()) {
+			return `${formatTime(start)} - ${formatTime(end)}`
+		}
+		
+		// Different days: include date in format "3/9 06:30 - 4/9 19:32"
+		const startFormatted = `${start.getDate()}/${start.getMonth() + 1} ${formatTime(start)}`
+		const endFormatted = `${end.getDate()}/${end.getMonth() + 1} ${formatTime(end)}`
+		
+		return `${startFormatted} - ${endFormatted}`
+	}
+
 	const formatCurrency = (amount: number) => {
 		return new Intl.NumberFormat('nl-NL', {
 			style: 'currency',
@@ -408,7 +424,10 @@ export default function ReservationsPage() {
 												)}
 											</h3>
 											<p className="text-sm text-gray-600 dark:text-gray-300">
-												{formatTime(new Date(reservation.reservation_start))} - {formatTime(new Date(reservation.effective_end > reservation.reservation_end ? reservation.effective_end : reservation.reservation_end))}
+												{formatTimeWithDate(
+													new Date(reservation.reservation_start),
+													new Date(reservation.effective_end > reservation.reservation_end ? reservation.effective_end : reservation.reservation_end)
+												)}
 											</p>
 										</div>
 									</div>
