@@ -12,6 +12,10 @@ interface Payment {
 	is_business_transaction: boolean
 	send_at: Date
 	paid_at?: Date
+	bunq_request_id?: number
+	bunq_payment_url?: string
+	bunq_status?: string
+	is_bunq_user_request?: boolean
 }
 
 interface PaymentResponse {
@@ -126,6 +130,40 @@ export default function PaymentTester() {
 		}
 	}
 
+	const syncBunqStatus = async (paymentId?: string) => {
+		setLoading(true)
+		setMessage('')
+		try {
+			const url = '/api/payments/sync-bunq-status'
+			const body = paymentId ? { payment_id: paymentId } : {}
+			
+			const response = await fetch(url, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(body)
+			})
+
+			const result = await response.json()
+
+			if (result.success) {
+				if (paymentId) {
+					setMessage(`Payment bunq status synced! Status: ${result.status || 'Unknown'}`)
+				} else {
+					setMessage(`Bunq status sync completed! Updated ${result.updated_count || 0} payments`)
+				}
+				fetchPayments() // Refresh the list
+			} else {
+				setMessage(`Error syncing bunq status: ${result.error}`)
+			}
+		} catch (error) {
+			setMessage(`Error: ${error}`)
+		} finally {
+			setLoading(false)
+		}
+	}
+
 	return (
 		<div className="max-w-4xl mx-auto p-6 space-y-6">
 			<h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Payment API Tester</h2>
@@ -224,13 +262,22 @@ export default function PaymentTester() {
 			<div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
 				<div className="flex justify-between items-center mb-4">
 					<h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Payments List</h3>
-					<button
-						onClick={fetchPayments}
-						disabled={loading}
-						className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 disabled:opacity-50 cursor-pointer"
-					>
-						{loading ? 'Laden...' : 'Refresh'}
-					</button>
+					<div className="flex gap-2">
+						<button
+							onClick={() => syncBunqStatus()}
+							disabled={loading}
+							className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+						>
+							{loading ? 'Syncing...' : 'Sync All Bunq Status'}
+						</button>
+						<button
+							onClick={fetchPayments}
+							disabled={loading}
+							className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 disabled:opacity-50 cursor-pointer"
+						>
+							{loading ? 'Laden...' : 'Refresh'}
+						</button>
+					</div>
 				</div>
 				
 				{payments.length === 0 ? (
@@ -253,16 +300,49 @@ export default function PaymentTester() {
 												</span>
 											)}
 										</div>
+										{/* Bunq Status Information */}
+										{payment.bunq_request_id && (
+											<div className="flex items-center gap-4 mt-2 text-sm">
+												<span className="text-blue-600">
+													Bunq ID: {payment.bunq_request_id}
+												</span>
+												{payment.bunq_status && (
+													<span className={`px-2 py-1 rounded text-xs font-medium ${
+														payment.bunq_status === 'ACCEPTED' 
+															? 'bg-green-100 text-green-800' 
+															: payment.bunq_status === 'PENDING'
+															? 'bg-yellow-100 text-yellow-800'
+															: 'bg-gray-100 text-gray-800'
+													}`}>
+														{payment.bunq_status}
+													</span>
+												)}
+												<span className="text-gray-500">
+													{payment.is_bunq_user_request ? 'User Request' : 'BunqMeTab'}
+												</span>
+											</div>
+										)}
 									</div>
-									{!payment.paid_at && (
-										<button
-											onClick={() => payment._id && markAsPaid(payment._id)}
-											disabled={loading}
-											className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 disabled:opacity-50 cursor-pointer"
-										>
-											Mark as Paid
-										</button>
-									)}
+									<div className="flex gap-2">
+										{payment.bunq_request_id && (
+											<button
+												onClick={() => payment._id && syncBunqStatus(payment._id)}
+												disabled={loading}
+												className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+											>
+												Sync Bunq
+											</button>
+										)}
+										{!payment.paid_at && (
+											<button
+												onClick={() => payment._id && markAsPaid(payment._id)}
+												disabled={loading}
+												className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 disabled:opacity-50 cursor-pointer"
+											>
+												Mark as Paid
+											</button>
+										)}
+									</div>
 								</div>
 							</div>
 						))}

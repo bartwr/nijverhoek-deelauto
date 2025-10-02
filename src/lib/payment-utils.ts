@@ -103,6 +103,7 @@ export async function updatePaymentBunqStatus(paymentId: string): Promise<{ succ
 			// If payment is accepted and not already marked as paid, mark it as paid
 			if (newStatus === 'ACCEPTED' && !payment.paid_at) {
 				updateData.paid_at = new Date()
+				console.log(`Payment ${paymentId}: Setting paid_at to ${updateData.paid_at.toISOString()} because bunq status changed to ACCEPTED`)
 			}
 			
 			await db.collection('Payments').updateOne(
@@ -111,6 +112,11 @@ export async function updatePaymentBunqStatus(paymentId: string): Promise<{ succ
 			)
 			
 			console.log(`Updated payment ${paymentId} bunq status from ${payment.bunq_status} to ${newStatus}`)
+			if (updateData.paid_at) {
+				console.log(`Payment ${paymentId}: paid_at set to ${updateData.paid_at.toISOString()}`)
+			}
+		} else {
+			console.log(`Payment ${paymentId}: No status change needed (current: ${payment.bunq_status}, new: ${newStatus})`)
 		}
 		
 		return { success: true, status: newStatus }

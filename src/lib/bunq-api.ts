@@ -61,6 +61,30 @@ export interface BunqMeTabResponse {
 		description: string
 		redirect_url?: string
 	}[]
+	result_inquiries?: {
+		id: number
+		created: string
+		updated: string
+		bunq_me_tab_id: number
+		payment: {
+			Payment: {
+				id: number
+				created: string
+				updated: string
+				monetary_account_id: number
+				amount: {
+					currency: string
+					value: string
+				}
+				description: string
+				payment_arrival_expected: {
+					status: string
+					time: string | null
+				}
+				[key: string]: unknown
+			}
+		}
+	}[]
 }
 
 export interface BunqApiContext {
@@ -640,19 +664,40 @@ class BunqApiClient {
 		if (tabDetails.bunqme_tab_entry && tabDetails.bunqme_tab_entry.length > 0) {
 			const tabEntry = tabDetails.bunqme_tab_entry[0]
 			
-			// For BunqMeTab, we need to check if there are any payments made to this tab
-			// The bunq API includes a result_inquiries array in the BunqMeTab response
-			// that contains information about payments made through this tab
-			
-			// TODO: The current BunqMeTabResponse interface might not include result_inquiries
-			// In a real implementation, you would check the result_inquiries array
-			// and determine the status based on whether payments have been made
-			
-			// For now, we'll assume PENDING status unless we can determine otherwise
+			// Check if there are any payments made to this tab by examining result_inquiries
 			let status = 'PENDING'
 			
-			// Check if the tab has expired
-			if (tabDetails.time_expiry) {
+			// Check result_inquiries for payment status
+			if (tabDetails.result_inquiries && tabDetails.result_inquiries.length > 0) {
+				console.log(`BunqMeTab ${tabId}: Found ${tabDetails.result_inquiries.length} result inquiries`)
+				
+				// Look for payments with ARRIVED status
+				const hasArrivedPayment = tabDetails.result_inquiries.some(inquiry => {
+					const payment = inquiry.payment?.Payment
+					if (payment && payment.payment_arrival_expected) {
+						console.log(`BunqMeTab ${tabId}: Payment ${payment.id} arrival status: ${payment.payment_arrival_expected.status}`)
+						return payment.payment_arrival_expected.status === 'ARRIVED'
+					}
+					return false
+				})
+				
+				if (hasArrivedPayment) {
+					status = 'ACCEPTED' // Payment has arrived, mark as accepted
+					console.log(`BunqMeTab ${tabId}: Payment has arrived, setting status to ACCEPTED`)
+				} else {
+					// Check if there are any payments at all (even if not arrived yet)
+					const hasPayments = tabDetails.result_inquiries.some(inquiry => inquiry.payment?.Payment)
+					if (hasPayments) {
+						status = 'PENDING' // Payments exist but haven't arrived yet
+						console.log(`BunqMeTab ${tabId}: Payments exist but haven't arrived yet, keeping status as PENDING`)
+					}
+				}
+			} else {
+				console.log(`BunqMeTab ${tabId}: No result inquiries found`)
+			}
+			
+			// Check if the tab has expired (only if no payments have been made)
+			if (status === 'PENDING' && tabDetails.time_expiry) {
 				const expiryDate = new Date(tabDetails.time_expiry)
 				const now = new Date()
 				if (now > expiryDate) {
