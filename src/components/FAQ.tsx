@@ -26,7 +26,7 @@ const faqData: FAQItem[] = [
 	},
 	{
 		question: 'Wat kost het?',
-		answer: 'De jaarlijkse kosten 20 euro. Initieel zijn de rijkosten: 3.50 euro per uur (maximaal 10 uur per dag) en 0.34 euro per km (inclusief elektriciteit). Deze kunnen wijzigen door de tijd',
+		answer: 'De jaarlijkse kosten 20 euro. Momenteel zijn de rijkosten: 3.20 euro per uur (maximaal 10 uur per dag) en 0.32 euro per km (inclusief elektriciteit). Deze kunnen wijzigen door de tijd',
 		icon: '💰'
 	},
 	{
