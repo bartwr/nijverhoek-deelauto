@@ -47,7 +47,7 @@ export async function POST(
 
 		// Get or create default price scheme
 		let defaultPriceScheme = await db.collection<PriceScheme>('PriceSchemes').findOne({
-			title: 'Standaard tarief per 2025-08-01'
+			title: 'Standaard tarief per 2025-10-01'
 		})
 
 		if (!defaultPriceScheme) {
