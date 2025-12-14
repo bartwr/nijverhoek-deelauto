@@ -121,7 +121,7 @@ export async function POST(
 				license_plate: reservationData.license_plate,
 				kilometers_start: reservationData.kilometers_start,
 				kilometers_end: reservationData.kilometers_end,
-				kilometers_driven: reservationData.kilometers_driven,
+				kilometers_driven: Number(reservationData.kilometers_driven?.toFixed?.(2) ?? reservationData.kilometers_driven),
 				price_scheme_id: defaultPriceScheme._id!,
 				total_costs: totalCosts,
 				remarks: reservationData.remarks
