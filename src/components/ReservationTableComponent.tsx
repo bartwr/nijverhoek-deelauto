@@ -138,7 +138,7 @@ export default function ReservationTableComponent({
 				<table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 					<thead className="bg-gray-50 dark:bg-gray-700">
 						<tr>
-							<th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+							<th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider sticky left-0 z-20 bg-gray-50 dark:bg-gray-700 border-r border-gray-200 dark:border-gray-700">
 								Acties
 							</th>
 							<th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -175,8 +175,17 @@ export default function ReservationTableComponent({
 					</thead>
 					<tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
 						{editableData.map((row, index) => (
-							<tr key={index} className={errors[index] ? 'bg-red-50 dark:bg-red-900' : ''}>
-								<td className="px-3 py-4 whitespace-nowrap">
+							<tr
+								key={index}
+								className={
+									errors[index]
+										? 'bg-red-50 dark:bg-red-900 hover:bg-red-100 dark:hover:bg-red-800 transition-colors'
+										: row.kilometers_driven < 1
+											? 'bg-red-50 dark:bg-red-900 hover:bg-red-100 dark:hover:bg-red-800 transition-colors'
+											: 'hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors'
+								}
+							>
+								<td className="px-3 py-4 whitespace-nowrap sticky left-0 z-10 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
 									<button
 										onClick={() => removeRow(index)}
 										className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200 cursor-pointer"
