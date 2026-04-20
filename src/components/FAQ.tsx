@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
 
 interface FAQItem {
@@ -92,6 +93,17 @@ export function FAQ() {
 								<div className="px-6 pb-4">
 									<div className="pt-2 border-t border-gray-100 dark:border-gray-600">
 										<p className="text-gray-700 dark:text-gray-300 leading-relaxed" dangerouslySetInnerHTML={{ __html: item.answer }} />
+										{index === 0 && (
+											<div className="mt-4">
+												<Image
+													src="/faq/auto-foto-small-compressed.png"
+													alt="Foto van de auto"
+													width={600}
+													height={400}
+													className="w-full max-w-[320px] h-auto rounded-lg"
+												/>
+											</div>
+										)}
 									</div>
 								</div>
 							)}
