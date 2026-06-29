@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { BarChart, StackedBarChart, HBarList } from '@/components/charts/ReportCharts'
+import { getUserSidebarItems } from '@/lib/sidebar-utils'
 
 interface AdminUser {
 	email: string
@@ -187,6 +188,7 @@ const formatDateNL = (iso: string) => {
 
 export default function JaaroverzichtPage() {
 	const [isLoggedIn, setIsLoggedIn] = useState(false)
+	const [isAdmin, setIsAdmin] = useState(false)
 	const [user, setUser] = useState<AdminUser | null>(null)
 	const [data, setData] = useState<OverviewData | null>(null)
 	const [isLoading, setIsLoading] = useState(true)
@@ -251,16 +253,31 @@ export default function JaaroverzichtPage() {
 
 	const checkAuthStatus = useCallback(async () => {
 		try {
-			const response = await fetch('/api/admin/check-auth')
-			if (response.ok) {
-				const result = await response.json()
+			// Admins get the full admin chrome; any logged-in user may view the page.
+			const adminResponse = await fetch('/api/admin/check-auth')
+			if (adminResponse.ok) {
+				const result = await adminResponse.json()
 				if (result.isLoggedIn) {
 					setIsLoggedIn(true)
+					setIsAdmin(true)
 					setUser(result.user)
 					await loadOverview()
 					return
 				}
 			}
+
+			const userResponse = await fetch('/api/user/check-auth')
+			if (userResponse.ok) {
+				const result = await userResponse.json()
+				if (result.isLoggedIn) {
+					setIsLoggedIn(true)
+					setIsAdmin(false)
+					setUser(result.user)
+					await loadOverview()
+					return
+				}
+			}
+
 			setIsLoggedIn(false)
 			setIsLoading(false)
 		} catch (err) {
@@ -276,33 +293,39 @@ export default function JaaroverzichtPage() {
 
 	const handleLogout = async () => {
 		try {
-			await fetch('/api/admin/logout', { method: 'POST' })
+			await fetch(isAdmin ? '/api/admin/logout' : '/api/user/logout', {
+				method: 'POST'
+			})
 			setIsLoggedIn(false)
 			setUser(null)
-			router.push('/admin')
+			router.push(isAdmin ? '/admin' : '/mijn/login')
 		} catch (err) {
 			console.error('Error logging out:', err)
 		}
 	}
 
-	const sidebarItems = [
-		{ href: '/admin', label: 'Dashboard', isActive: false },
-		{ href: '/admin/jaaroverzicht', label: 'Jaaroverzicht', isActive: true },
-		{ href: '/admin/maandincasso', label: 'Maandincasso', isActive: false }
-	]
+	// Admins see the admin menu (incl. the Jaaroverzicht link); regular users
+	// see their own menu, which intentionally has no Jaaroverzicht link.
+	const sidebarItems = isAdmin
+		? [
+				{ href: '/admin', label: 'Dashboard', isActive: false },
+				{ href: '/admin/jaaroverzicht', label: 'Jaaroverzicht', isActive: true },
+				{ href: '/admin/maandincasso', label: 'Maandincasso', isActive: false }
+			]
+		: getUserSidebarItems('/mijn')
 
 	if (!isLoggedIn && !isLoading) {
 		return (
 			<div className="min-h-screen bg-gradient-to-br from-[#ea5c33]/5 via-white to-[#ea5c33]/5 dark:from-[#ea5c33]/10 dark:via-gray-900 dark:to-[#ea5c33]/10 flex items-center justify-center px-4">
 				<div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 text-center max-w-md">
 					<p className="text-gray-700 dark:text-gray-200 mb-4">
-						Je moet ingelogd zijn om het jaaroverzicht te bekijken.
+						Je moet ingelogd zijn om dit overzicht te bekijken.
 					</p>
 					<a
-						href="/admin"
+						href={`/mijn/login?redirect=${encodeURIComponent('/admin/jaaroverzicht')}`}
 						className="inline-block px-6 py-3 bg-[#ea5c33] hover:bg-[#ea5c33]/90 text-white font-medium rounded-lg transition-colors cursor-pointer"
 					>
-						Naar admin login
+						Naar login
 					</a>
 				</div>
 			</div>
@@ -311,7 +334,7 @@ export default function JaaroverzichtPage() {
 
 	return (
 		<AdminLayout
-			title="Deelauto Nijverhoek admin"
+			title={isAdmin ? 'Deelauto Nijverhoek admin' : 'Deelauto Nijverhoek'}
 			sidebarItems={sidebarItems}
 			onLogout={handleLogout}
 		>

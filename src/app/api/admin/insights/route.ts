@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { connectToDatabase } from '@/lib/mongodb'
 import { cookies } from 'next/headers'
 import { computeOverview, OverviewResult } from '@/lib/overview-stats'
+import { hasValidAdminOrUserSession } from '@/lib/auth-utils'
 
 const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions'
 const MISTRAL_MODEL = process.env.MISTRAL_MODEL || 'mistral-small-latest'
@@ -55,19 +56,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 		const { searchParams } = new URL(request.url)
 		const yearParam = searchParams.get('year') || 'all'
 
-		const cookieStore = await cookies()
-		const sessionToken = cookieStore.get('admin_session')
-		if (!sessionToken) {
-			return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 })
-		}
-
 		const { db } = await connectToDatabase()
-		const session = await db.collection('AdminSessions').findOne({
-			sessionToken: sessionToken.value,
-			expiresAt: { $gt: new Date() }
-		})
-		if (!session) {
-			return NextResponse.json({ error: 'Sessie verlopen' }, { status: 401 })
+		const cookieStore = await cookies()
+
+		const isAuthenticated = await hasValidAdminOrUserSession(db, cookieStore)
+		if (!isAuthenticated) {
+			return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 })
 		}
 
 		const overview = await computeOverview(db, yearParam)
