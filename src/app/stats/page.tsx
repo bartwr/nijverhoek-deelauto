@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import { BarChart, StackedBarChart, HBarList } from '@/components/charts/ReportCharts'
 import { getUserSidebarItems } from '@/lib/sidebar-utils'
+import PublicStats from './PublicStats'
 
 interface AdminUser {
 	email: string
@@ -314,22 +315,18 @@ export default function StatsPage() {
 			]
 		: getUserSidebarItems('/mijn')
 
-	if (!isLoggedIn && !isLoading) {
+	// While the auth check is still resolving we don't yet know whether to show
+	// the admin chrome or the public view, so show a neutral loading screen.
+	if (!isLoggedIn && isLoading) {
 		return (
-			<div className="min-h-screen bg-gradient-to-br from-[#ea5c33]/5 via-white to-[#ea5c33]/5 dark:from-[#ea5c33]/10 dark:via-gray-900 dark:to-[#ea5c33]/10 flex items-center justify-center px-4">
-				<div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700 text-center max-w-md">
-					<p className="text-gray-700 dark:text-gray-200 mb-4">
-						Je moet ingelogd zijn om dit overzicht te bekijken.
-					</p>
-					<a
-						href={`/mijn/login?redirect=${encodeURIComponent('/stats')}`}
-						className="inline-block px-6 py-3 bg-[#ea5c33] hover:bg-[#ea5c33]/90 text-white font-medium rounded-lg transition-colors cursor-pointer"
-					>
-						Naar login
-					</a>
-				</div>
+			<div className="min-h-screen bg-gradient-to-br from-[#ea5c33]/5 via-white to-[#ea5c33]/5 dark:from-[#ea5c33]/10 dark:via-gray-900 dark:to-[#ea5c33]/10 flex items-center justify-center">
+				<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ea5c33]" />
 			</div>
 		)
+	}
+
+	if (!isLoggedIn) {
+		return <PublicStats />
 	}
 
 	return (
