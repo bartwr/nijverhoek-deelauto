@@ -185,6 +185,10 @@ export interface OverviewResult {
 		km: number
 		effectiveHours: number
 		income: number
+		reservationsPrivate: number
+		kmPrivate: number
+		effectiveHoursPrivate: number
+		incomePrivate: number
 	}>
 }
 
@@ -264,6 +268,10 @@ export async function computeOverview(
 		km: number
 		effectiveHours: number
 		income: number
+		reservationsPrivate: number
+		kmPrivate: number
+		effectiveHoursPrivate: number
+		incomePrivate: number
 	}>()
 
 	let totalKm = 0
@@ -375,7 +383,11 @@ export async function computeOverview(
 				reservations: 0,
 				km: 0,
 				effectiveHours: 0,
-				income: 0
+				income: 0,
+				reservationsPrivate: 0,
+				kmPrivate: 0,
+				effectiveHoursPrivate: 0,
+				incomePrivate: 0
 			}
 			byUser.set(userId, userBucket)
 		}
@@ -383,6 +395,12 @@ export async function computeOverview(
 		userBucket.km += km
 		userBucket.effectiveHours += effectiveHours
 		userBucket.income += cost
+		if (!isBusiness) {
+			userBucket.reservationsPrivate += 1
+			userBucket.kmPrivate += km
+			userBucket.effectiveHoursPrivate += effectiveHours
+			userBucket.incomePrivate += cost
+		}
 
 		// Occupancy: distribute the reserved window across local days.
 		const resStartLocal = localMs(getNLParts(reservedStart))
@@ -500,7 +518,11 @@ export async function computeOverview(
 			reservations: u.reservations,
 			km: round(u.km),
 			effectiveHours: round1(u.effectiveHours),
-			income: round2(u.income)
+			income: round2(u.income),
+			reservationsPrivate: u.reservationsPrivate,
+			kmPrivate: round(u.kmPrivate),
+			effectiveHoursPrivate: round1(u.effectiveHoursPrivate),
+			incomePrivate: round2(u.incomePrivate)
 		}))
 
 	const paidTotal = payments

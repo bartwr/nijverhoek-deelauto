@@ -50,6 +50,10 @@ interface UserRow {
 	km: number
 	effectiveHours: number
 	income: number
+	reservationsPrivate: number
+	kmPrivate: number
+	effectiveHoursPrivate: number
+	incomePrivate: number
 }
 
 interface OverviewData {
@@ -137,13 +141,24 @@ function groupUsersByHousehold(users: UserRow[]): UserRow[] {
 			existing.effectiveHours =
 				Math.round((existing.effectiveHours + u.effectiveHours) * 10) / 10
 			existing.income = Math.round((existing.income + u.income) * 100) / 100
+			existing.reservationsPrivate += u.reservationsPrivate
+			existing.kmPrivate = Math.round((existing.kmPrivate + u.kmPrivate) * 10) / 10
+			existing.effectiveHoursPrivate =
+				Math.round((existing.effectiveHoursPrivate + u.effectiveHoursPrivate) * 10) /
+				10
+			existing.incomePrivate =
+				Math.round((existing.incomePrivate + u.incomePrivate) * 100) / 100
 		} else {
 			grouped.set(key, {
 				name: key,
 				reservations: u.reservations,
 				km: u.km,
 				effectiveHours: u.effectiveHours,
-				income: u.income
+				income: u.income,
+				reservationsPrivate: u.reservationsPrivate,
+				kmPrivate: u.kmPrivate,
+				effectiveHoursPrivate: u.effectiveHoursPrivate,
+				incomePrivate: u.incomePrivate
 			})
 		}
 	}
@@ -181,6 +196,7 @@ export default function JaaroverzichtPage() {
 	const [insights, setInsights] = useState<InsightsResponse | null>(null)
 	const [insightsLoading, setInsightsLoading] = useState(false)
 	const [groupByHousehold, setGroupByHousehold] = useState(false)
+	const [includeBusiness, setIncludeBusiness] = useState(true)
 	const router = useRouter()
 
 	const loadInsights = useCallback(async (year: string) => {
@@ -494,15 +510,31 @@ export default function JaaroverzichtPage() {
 						const userRows = groupByHousehold
 							? groupUsersByHousehold(data.byUser)
 							: data.byUser
-						const byIncome = [...userRows].sort((a, b) => b.income - a.income)
-						const byKm = [...userRows].sort((a, b) => b.km - a.km)
+						const pickIncome = (u: UserRow) =>
+							includeBusiness ? u.income : u.incomePrivate
+						const pickKm = (u: UserRow) =>
+							includeBusiness ? u.km : u.kmPrivate
+						const pickReservations = (u: UserRow) =>
+							includeBusiness ? u.reservations : u.reservationsPrivate
+						const pickHours = (u: UserRow) =>
+							includeBusiness ? u.effectiveHours : u.effectiveHoursPrivate
+						const byIncome = [...userRows].sort(
+							(a, b) => pickIncome(b) - pickIncome(a)
+						)
+						const byKm = [...userRows].sort((a, b) => pickKm(b) - pickKm(a))
 						const entityLabel = groupByHousehold ? 'huishouden' : 'gebruiker'
 						return (
 							<div className="space-y-4">
-								<div className="flex justify-end">
-									<HouseholdToggle
+								<div className="flex flex-wrap justify-end gap-x-6 gap-y-2">
+									<LabeledToggle
+										label="Groepeer per huishouden"
 										checked={groupByHousehold}
 										onChange={setGroupByHousehold}
+									/>
+									<LabeledToggle
+										label="Zakelijke ritten inclusief"
+										checked={includeBusiness}
+										onChange={setIncludeBusiness}
 									/>
 								</div>
 								<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -510,8 +542,8 @@ export default function JaaroverzichtPage() {
 										<HBarList
 											data={byIncome.map((u) => ({
 												label: u.name,
-												value: u.income,
-												caption: `${u.reservations} ritten`
+												value: pickIncome(u),
+												caption: `${pickReservations(u)} ritten`
 											}))}
 											color={BRAND}
 											formatValue={(v) => euro2(v)}
@@ -522,8 +554,8 @@ export default function JaaroverzichtPage() {
 										<HBarList
 											data={byKm.map((u) => ({
 												label: u.name,
-												value: u.km,
-												caption: `${u.effectiveHours} u`
+												value: pickKm(u),
+												caption: `${pickHours(u)} u`
 											}))}
 											color={BLUE}
 											formatValue={(v) => `${num(v)} km`}
@@ -682,10 +714,12 @@ function InsightsSection({
 	)
 }
 
-function HouseholdToggle({
+function LabeledToggle({
+	label,
 	checked,
 	onChange
 }: {
+	label: string
 	checked: boolean
 	onChange: (value: boolean) => void
 }) {
@@ -708,7 +742,7 @@ function HouseholdToggle({
 					}`}
 				/>
 			</span>
-			Groepeer per huishouden
+			{label}
 		</button>
 	)
 }
