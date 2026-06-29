@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, ReactNode } from 'react'
+import Link from 'next/link'
 import { BarChart } from '@/components/charts/ReportCharts'
 
 interface PublicMonthlyRow {
@@ -111,12 +112,12 @@ export default function PublicStats() {
 							>
 								Login
 							</a>
-							<a
+							<Link
 								href="/"
 								className="px-4 py-2 text-sm font-medium text-[#ea5c33] border border-[#ea5c33] hover:bg-[#ea5c33]/10 rounded-md transition-colors cursor-pointer"
 							>
 								Meer informatie
-							</a>
+							</Link>
 						</div>
 					</div>
 				</div>
