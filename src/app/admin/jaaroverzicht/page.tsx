@@ -85,6 +85,24 @@ interface OverviewData {
 	byUser: UserRow[]
 }
 
+interface Insight {
+	emoji: string
+	title: string
+	text: string
+	type: 'useful' | 'fun'
+}
+
+interface InsightsResponse {
+	success: boolean
+	configured: boolean
+	cached?: boolean
+	generatedAt?: string
+	model?: string
+	insights: Insight[]
+	error?: string
+	message?: string
+}
+
 const BRAND = '#ea5c33'
 const BLUE = '#3b82f6'
 const GREEN = '#10b981'
@@ -117,7 +135,30 @@ export default function JaaroverzichtPage() {
 	const [error, setError] = useState('')
 	const [selectedYear, setSelectedYear] = useState('all')
 	const [availableYears, setAvailableYears] = useState<number[]>([])
+	const [insights, setInsights] = useState<InsightsResponse | null>(null)
+	const [insightsLoading, setInsightsLoading] = useState(false)
 	const router = useRouter()
+
+	const loadInsights = useCallback(async (year: string) => {
+		setInsightsLoading(true)
+		setInsights(null)
+		try {
+			const response = await fetch(`/api/admin/insights?year=${year}`, {
+				method: 'POST'
+			})
+			const json = await response.json()
+			setInsights(json)
+		} catch {
+			setInsights({
+				success: false,
+				configured: true,
+				insights: [],
+				error: 'Kon de insights niet laden'
+			})
+		} finally {
+			setInsightsLoading(false)
+		}
+	}, [])
 
 	const loadOverview = useCallback(async (year: string = 'all') => {
 		setIsLoading(true)
@@ -135,6 +176,9 @@ export default function JaaroverzichtPage() {
 				if (Array.isArray(json.availableYears)) {
 					setAvailableYears(json.availableYears)
 				}
+				if (!json.empty) {
+					loadInsights(year)
+				}
 			} else {
 				setError(json.error || 'Kon het jaaroverzicht niet laden')
 			}
@@ -143,7 +187,7 @@ export default function JaaroverzichtPage() {
 		} finally {
 			setIsLoading(false)
 		}
-	}, [])
+	}, [loadInsights])
 
 	const checkAuthStatus = useCallback(async () => {
 		try {
@@ -305,6 +349,12 @@ export default function JaaroverzichtPage() {
 							sub={`open: ${euro2(data.kpis.outstandingTotal)}`}
 						/>
 					</div>
+
+					{/* AI Insights */}
+					<InsightsSection
+						loading={insightsLoading}
+						insights={insights}
+					/>
 
 					{/* Income split per month */}
 					<Panel title="Inkomsten per maand (zakelijk vs privé)">
@@ -478,6 +528,97 @@ export default function JaaroverzichtPage() {
 				</div>
 			)}
 		</AdminLayout>
+	)
+}
+
+function InsightsSection({
+	loading,
+	insights
+}: {
+	loading: boolean
+	insights: InsightsResponse | null
+}) {
+	const generatedLabel = insights?.generatedAt
+		? new Date(insights.generatedAt).toLocaleDateString('nl-NL', {
+				day: 'numeric',
+				month: 'long',
+				year: 'numeric'
+			})
+		: null
+
+	return (
+		<div className="bg-gradient-to-br from-[#ea5c33]/10 to-purple-500/5 dark:from-[#ea5c33]/15 dark:to-purple-500/10 rounded-2xl shadow-sm p-5 border border-[#ea5c33]/20">
+			<div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+				<h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+					<span aria-hidden>✨</span> Insights
+					<span className="text-xs font-normal text-gray-400 dark:text-gray-500">
+						AI-analyse
+					</span>
+				</h3>
+				{generatedLabel && (
+					<span className="text-xs text-gray-400 dark:text-gray-500">
+						Gegenereerd op {generatedLabel} · ververst ~1× per maand
+					</span>
+				)}
+			</div>
+
+			{loading && (
+				<div className="flex items-center gap-3 text-gray-600 dark:text-gray-300 py-4">
+					<div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#ea5c33]" />
+					<span>De auto-data wordt geanalyseerd...</span>
+				</div>
+			)}
+
+			{!loading && insights && !insights.configured && (
+				<div className="text-sm text-gray-700 dark:text-gray-200 bg-white/60 dark:bg-gray-800/60 rounded-lg p-4">
+					<p className="font-medium mb-1">AI is nog niet geconfigureerd</p>
+					<p className="text-gray-600 dark:text-gray-300">
+						Zet je Mistral API key in{' '}
+						<code className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700">
+							.env.local
+						</code>{' '}
+						als{' '}
+						<code className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-700">
+							MISTRAL_API_KEY
+						</code>{' '}
+						en herstart de server. Daarna verschijnen hier automatisch inzichten.
+					</p>
+				</div>
+			)}
+
+			{!loading &&
+				insights &&
+				insights.configured &&
+				insights.error &&
+				insights.insights.length === 0 && (
+					<div className="text-sm text-red-600 dark:text-red-400 bg-white/60 dark:bg-gray-800/60 rounded-lg p-4">
+						{insights.error}
+					</div>
+				)}
+
+			{!loading && insights && insights.insights.length > 0 && (
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+					{insights.insights.map((insight, i) => (
+						<div
+							key={i}
+							className="flex gap-3 bg-white/70 dark:bg-gray-800/70 rounded-xl p-3 border border-gray-100 dark:border-gray-700"
+						>
+							<div className="text-2xl leading-none shrink-0" aria-hidden>
+								{insight.emoji}
+							</div>
+							<div>
+								<p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
+									{insight.title}
+								</p>
+								<p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">
+									{insight.text}
+								</p>
+							</div>
+						</div>
+					))}
+				</div>
+			)}
+		</div>
 	)
 }
 
