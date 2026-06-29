@@ -107,6 +107,49 @@ const BRAND = '#ea5c33'
 const BLUE = '#3b82f6'
 const GREEN = '#10b981'
 
+// Members that share a single car-sharing household; their values are summed
+// when the "groepeer per huishouden" toggle is enabled.
+const HOUSEHOLDS: string[][] = [
+	['Bart Roorda', 'Janine Terlouw'],
+	['Deborah Cheng', 'Shen Cheng'],
+	['Jeroen van Veen', 'Wout Adriana Vervaart']
+]
+
+const normalizeName = (name: string) =>
+	name.replace(/\s+/g, ' ').trim().toLowerCase()
+
+const householdLabelByName = new Map<string, string>()
+for (const members of HOUSEHOLDS) {
+	const label = members.join(' & ')
+	for (const member of members) {
+		householdLabelByName.set(normalizeName(member), label)
+	}
+}
+
+function groupUsersByHousehold(users: UserRow[]): UserRow[] {
+	const grouped = new Map<string, UserRow>()
+	for (const u of users) {
+		const key = householdLabelByName.get(normalizeName(u.name)) || u.name
+		const existing = grouped.get(key)
+		if (existing) {
+			existing.reservations += u.reservations
+			existing.km = Math.round((existing.km + u.km) * 10) / 10
+			existing.effectiveHours =
+				Math.round((existing.effectiveHours + u.effectiveHours) * 10) / 10
+			existing.income = Math.round((existing.income + u.income) * 100) / 100
+		} else {
+			grouped.set(key, {
+				name: key,
+				reservations: u.reservations,
+				km: u.km,
+				effectiveHours: u.effectiveHours,
+				income: u.income
+			})
+		}
+	}
+	return Array.from(grouped.values())
+}
+
 const euro = (v: number) =>
 	new Intl.NumberFormat('nl-NL', {
 		style: 'currency',
@@ -137,6 +180,7 @@ export default function JaaroverzichtPage() {
 	const [availableYears, setAvailableYears] = useState<number[]>([])
 	const [insights, setInsights] = useState<InsightsResponse | null>(null)
 	const [insightsLoading, setInsightsLoading] = useState(false)
+	const [groupByHousehold, setGroupByHousehold] = useState(false)
 	const router = useRouter()
 
 	const loadInsights = useCallback(async (year: string) => {
@@ -446,33 +490,49 @@ export default function JaaroverzichtPage() {
 					</div>
 
 					{/* Per user */}
-					<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-						<Panel title="Inkomsten per gebruiker">
-							<HBarList
-								data={data.byUser.map((u) => ({
-									label: u.name,
-									value: u.income,
-									caption: `${u.reservations} ritten`
-								}))}
-								color={BRAND}
-								formatValue={(v) => euro2(v)}
-							/>
-						</Panel>
+					{(() => {
+						const userRows = groupByHousehold
+							? groupUsersByHousehold(data.byUser)
+							: data.byUser
+						const byIncome = [...userRows].sort((a, b) => b.income - a.income)
+						const byKm = [...userRows].sort((a, b) => b.km - a.km)
+						const entityLabel = groupByHousehold ? 'huishouden' : 'gebruiker'
+						return (
+							<div className="space-y-4">
+								<div className="flex justify-end">
+									<HouseholdToggle
+										checked={groupByHousehold}
+										onChange={setGroupByHousehold}
+									/>
+								</div>
+								<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+									<Panel title={`Inkomsten per ${entityLabel}`}>
+										<HBarList
+											data={byIncome.map((u) => ({
+												label: u.name,
+												value: u.income,
+												caption: `${u.reservations} ritten`
+											}))}
+											color={BRAND}
+											formatValue={(v) => euro2(v)}
+										/>
+									</Panel>
 
-						<Panel title="Kilometers per gebruiker">
-							<HBarList
-								data={[...data.byUser]
-									.sort((a, b) => b.km - a.km)
-									.map((u) => ({
-										label: u.name,
-										value: u.km,
-										caption: `${u.effectiveHours} u`
-									}))}
-								color={BLUE}
-								formatValue={(v) => `${num(v)} km`}
-							/>
-						</Panel>
-					</div>
+									<Panel title={`Kilometers per ${entityLabel}`}>
+										<HBarList
+											data={byKm.map((u) => ({
+												label: u.name,
+												value: u.km,
+												caption: `${u.effectiveHours} u`
+											}))}
+											color={BLUE}
+											formatValue={(v) => `${num(v)} km`}
+										/>
+									</Panel>
+								</div>
+							</div>
+						)
+					})()}
 
 					{/* Monthly detail table */}
 					<Panel title="Maanddetails">
@@ -619,6 +679,37 @@ function InsightsSection({
 				</div>
 			)}
 		</div>
+	)
+}
+
+function HouseholdToggle({
+	checked,
+	onChange
+}: {
+	checked: boolean
+	onChange: (value: boolean) => void
+}) {
+	return (
+		<button
+			type="button"
+			role="switch"
+			aria-checked={checked}
+			onClick={() => onChange(!checked)}
+			className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200 cursor-pointer"
+		>
+			<span
+				className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+					checked ? 'bg-[#ea5c33]' : 'bg-gray-300 dark:bg-gray-600'
+				}`}
+			>
+				<span
+					className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+						checked ? 'translate-x-4' : 'translate-x-1'
+					}`}
+				/>
+			</span>
+			Groepeer per huishouden
+		</button>
 	)
 }
 
