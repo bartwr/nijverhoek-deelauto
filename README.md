@@ -18,12 +18,14 @@ Deelauto Nijverhoek is een lokaal initiatief van drie huishoudens die gezamenlij
 ## 🛠️ Technische Details
 
 ### Gebruikte Technologieën
+
 - **Next.js 14** - Moderne React framework met App Router
 - **TypeScript** - Voor type-veilige code
 - **Tailwind CSS** - Voor snelle, responsieve styling
 - **React Hooks** - Voor interactieve functionaliteit
 
 ### Project Structuur
+
 ```
 src/
 ├── app/
@@ -41,10 +43,12 @@ src/
 ## 🚀 Installatie en Uitvoering
 
 ### Vereisten
+
 - Node.js 18+ 
 - npm of yarn
 
 ### Installatie
+
 ```bash
 # Clone de repository
 git clone [repository-url]
@@ -60,6 +64,7 @@ npm run dev
 De applicatie is nu beschikbaar op `http://localhost:3000`
 
 ### Build voor productie
+
 ```bash
 npm run build
 npm start
@@ -68,19 +73,23 @@ npm start
 ## 📱 Inhoud van de Landing Page
 
 ### 1. Header
+
 - Titel: "Deelauto Nijverhoek" met gradient styling
 
 ### 2. Hero Sectie
+
 - Hoofdtitel: "Een auto in de buurt, voor de buurt"
 - Ondertitel: "Je betaalt alleen voor wat je rijdt"
 - Animaties afbeelding van Giphy
 - Feature highlights (Elektrisch rijden, 400 km actieradius, Gedeelde kosten)
 
 ### 3. Uitleg Sectie
+
 - Centrale boodschap in een aantrekkelijke kaart
 - Visuele elementen en iconen
 
 ### 4. FAQ Sectie
+
 - **Om welke auto gaat het?** - Kia e-Niro met 400 km actieradius
 - **Wie is de initiatiefnemer?** - Drie huishoudens in de Nijverhoek
 - **Hoe kan ik gebruik maken van de auto?** - Testperiode en account aanmaken
@@ -89,11 +98,13 @@ npm start
 - **Wat zijn de 'huisregels'?** - Overeenkomst en regels
 
 ### 5. Contact Sectie
+
 - Call-to-action: "Interesse? Stuur een e-mail"
 - Contact informatie (e-mail en telefoon)
 - Aantrekkelijke gradient achtergrond
 
 ### 6. Footer
+
 - Aanvullende informatie en links
 - Link naar mijn.deelauto.nl
 - Copyright informatie
@@ -109,6 +120,7 @@ npm start
 ## 🔧 Configuratie
 
 ### Externe Afbeeldingen
+
 De applicatie is geconfigureerd om externe afbeeldingen van Giphy te laden via `next.config.ts`:
 
 ```typescript
@@ -125,7 +137,9 @@ images: {
 ```
 
 ### Metadata
+
 SEO-geoptimaliseerde metadata in `layout.tsx`:
+
 - Titel en beschrijving
 - Open Graph tags voor social media
 - Keywords en auteur informatie
@@ -133,7 +147,8 @@ SEO-geoptimaliseerde metadata in `layout.tsx`:
 ## 📧 Contact
 
 Voor vragen over de deelauto:
-- **E-mail**: auto@nijverhoek.nl
+
+- **E-mail**: [auto@nijverhoek.nl](mailto:auto@nijverhoek.nl)
 
 ## 🤝 Bijdragen
 

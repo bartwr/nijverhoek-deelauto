@@ -20,9 +20,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 		const overview = await computeOverview(db, yearParam)
 		return NextResponse.json(overview)
 	} catch (error) {
-		console.error('Error building jaaroverzicht:', error)
+		console.error('Error building stats:', error)
 		return NextResponse.json(
-			{ error: 'Fout bij het opbouwen van het jaaroverzicht' },
+			{ error: 'Fout bij het opbouwen van de statistieken' },
 			{ status: 500 }
 		)
 	}

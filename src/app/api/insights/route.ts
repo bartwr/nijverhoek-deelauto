@@ -6,7 +6,7 @@ import { hasValidAdminOrUserSession } from '@/lib/auth-utils'
 
 const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions'
 const MISTRAL_MODEL = process.env.MISTRAL_MODEL || 'mistral-small-latest'
-const CACHE_COLLECTION = 'AdminInsightsCache'
+const CACHE_COLLECTION = 'InsightsCache'
 // Regenerate at most once every ~30 days (the dataset grows slowly).
 const CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000
 

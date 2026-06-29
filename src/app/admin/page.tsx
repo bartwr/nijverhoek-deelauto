@@ -172,7 +172,7 @@ export default function AdminPage() {
 	if (isLoggedIn && user) {
 		const sidebarItems = [
 			{ href: '/admin', label: 'Dashboard', isActive: true },
-			{ href: '/admin/jaaroverzicht', label: 'Jaaroverzicht', isActive: false },
+			{ href: '/stats', label: 'Jaaroverzicht', isActive: false },
 			{ href: '/admin/maandincasso', label: 'Maandincasso', isActive: false }
 		]
 

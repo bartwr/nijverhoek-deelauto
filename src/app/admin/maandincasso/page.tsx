@@ -168,7 +168,7 @@ export default function MaandincassoPage() {
 
 	const sidebarItems = [
 		{ href: '/admin', label: 'Dashboard', isActive: false },
-		{ href: '/admin/jaaroverzicht', label: 'Jaaroverzicht', isActive: false },
+		{ href: '/stats', label: 'Jaaroverzicht', isActive: false },
 		{ href: '/admin/maandincasso', label: 'Maandincasso', isActive: true }
 	]
 

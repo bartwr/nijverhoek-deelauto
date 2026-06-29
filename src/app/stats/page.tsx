@@ -186,7 +186,7 @@ const formatDateNL = (iso: string) => {
 	return `${d}-${m}-${y}`
 }
 
-export default function JaaroverzichtPage() {
+export default function StatsPage() {
 	const [isLoggedIn, setIsLoggedIn] = useState(false)
 	const [isAdmin, setIsAdmin] = useState(false)
 	const [user, setUser] = useState<AdminUser | null>(null)
@@ -205,7 +205,7 @@ export default function JaaroverzichtPage() {
 		setInsightsLoading(true)
 		setInsights(null)
 		try {
-			const response = await fetch(`/api/admin/insights?year=${year}`, {
+			const response = await fetch(`/api/insights?year=${year}`, {
 				method: 'POST'
 			})
 			const json = await response.json()
@@ -227,7 +227,7 @@ export default function JaaroverzichtPage() {
 		setError('')
 		setSelectedYear(year)
 		try {
-			const response = await fetch(`/api/admin/jaaroverzicht?year=${year}`)
+			const response = await fetch(`/api/stats?year=${year}`)
 			if (response.status === 401) {
 				setIsLoggedIn(false)
 				return
@@ -242,7 +242,7 @@ export default function JaaroverzichtPage() {
 					loadInsights(year)
 				}
 			} else {
-				setError(json.error || 'Kon het jaaroverzicht niet laden')
+				setError(json.error || 'Kon de statistieken niet laden')
 			}
 		} catch {
 			setError('Er is een fout opgetreden bij het laden van de gegevens')
@@ -304,12 +304,12 @@ export default function JaaroverzichtPage() {
 		}
 	}
 
-	// Admins see the admin menu (incl. the Jaaroverzicht link); regular users
-	// see their own menu, which intentionally has no Jaaroverzicht link.
+	// Admins see the admin menu (incl. the stats link); regular users see their
+	// own menu, which intentionally has no stats link.
 	const sidebarItems = isAdmin
 		? [
 				{ href: '/admin', label: 'Dashboard', isActive: false },
-				{ href: '/admin/jaaroverzicht', label: 'Jaaroverzicht', isActive: true },
+				{ href: '/stats', label: 'Jaaroverzicht', isActive: true },
 				{ href: '/admin/maandincasso', label: 'Maandincasso', isActive: false }
 			]
 		: getUserSidebarItems('/mijn')
@@ -322,7 +322,7 @@ export default function JaaroverzichtPage() {
 						Je moet ingelogd zijn om dit overzicht te bekijken.
 					</p>
 					<a
-						href={`/mijn/login?redirect=${encodeURIComponent('/admin/jaaroverzicht')}`}
+						href={`/mijn/login?redirect=${encodeURIComponent('/stats')}`}
 						className="inline-block px-6 py-3 bg-[#ea5c33] hover:bg-[#ea5c33]/90 text-white font-medium rounded-lg transition-colors cursor-pointer"
 					>
 						Naar login
@@ -341,7 +341,7 @@ export default function JaaroverzichtPage() {
 			<div className="flex flex-wrap items-end justify-between gap-3 mb-6">
 				<div>
 					<h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-						{selectedYear === 'all' ? 'Overzicht (alle tijd)' : `Jaaroverzicht ${selectedYear}`}
+						{selectedYear === 'all' ? 'Overzicht (totaal)' : `Jaaroverzicht ${selectedYear}`}
 					</h2>
 					{data && !data.empty && (
 						<p className="text-gray-600 dark:text-gray-300 mt-1">
