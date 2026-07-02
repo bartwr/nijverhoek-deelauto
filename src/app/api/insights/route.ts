@@ -35,7 +35,51 @@ function dataSignature(overview: OverviewResult): string {
 	].join('|')
 }
 
-function buildPrompt(overview: OverviewResult): string {
+function buildPrompt(overview: OverviewResult, isPublic: boolean): string {
+	if (isPublic) {
+		// Strip every financial field and the per-user breakdown so that
+		// anonymous visitors never receive euro amounts or personal names.
+		const publicKpis = overview.kpis
+			? {
+					totalReservations: overview.kpis.totalReservations,
+					totalKm: overview.kpis.totalKm,
+					totalEffectiveHours: overview.kpis.totalEffectiveHours,
+					totalReservedHours: overview.kpis.totalReservedHours,
+					avgReservationsPerDay: overview.kpis.avgReservationsPerDay,
+					avgKmPerReservation: overview.kpis.avgKmPerReservation,
+					avgEffectiveHoursPerReservation:
+						overview.kpis.avgEffectiveHoursPerReservation,
+					avgAvailableHoursPerDay: overview.kpis.avgAvailableHoursPerDay,
+					avgOccupiedHoursPerDay: overview.kpis.avgOccupiedHoursPerDay,
+					occupancyPct: overview.kpis.occupancyPct,
+					activeUsers: overview.kpis.activeUsers
+				}
+			: undefined
+		const publicMonthly = overview.monthly?.map((m) => ({
+			month: m.month,
+			label: m.label,
+			reservations: m.reservations,
+			km: m.km,
+			effectiveHours: m.effectiveHours,
+			reservedHours: m.reservedHours,
+			avgAvailableHoursPerDay: m.avgAvailableHoursPerDay,
+			occupancyPct: m.occupancyPct
+		}))
+
+		const compact = {
+			periode: overview.period,
+			venster_beschikbaarheid: overview.window,
+			kpis: publicKpis,
+			per_maand: publicMonthly,
+			per_weekdag: overview.byWeekday,
+			per_uur: overview.byHour
+		}
+
+		return `Hier zijn de gebruiksgegevens van één elektrische deelauto die door buurtbewoners gedeeld wordt (afstanden in km, tijden in uren, tijdzone Europe/Amsterdam). Het beschikbaarheidsvenster is 06:00-24:00.\n\nDATA (JSON):\n${JSON.stringify(
+			compact
+		)}\n\nGeef 3 tot 5 korte, pakkende inzichten over hoe de auto gebruikt wordt. Mix nuttige observaties met een paar luchtige, grappige observaties. Baseer alles strikt op de data; verzin geen cijfers. BELANGRIJK: dit is voor een openbare pagina, dus noem GEEN bedragen in euro's en GEEN namen van personen. Schrijf in het Nederlands, informeel en bondig (max ~25 woorden per inzicht).`
+	}
+
 	const compact = {
 		periode: overview.period,
 		venster_beschikbaarheid: overview.window,
@@ -60,12 +104,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 		const cookieStore = await cookies()
 
 		const isAuthenticated = await hasValidAdminOrUserSession(db, cookieStore)
-		if (!isAuthenticated) {
-			return NextResponse.json({ error: 'Niet geautoriseerd' }, { status: 401 })
-		}
+		const isPublic = !isAuthenticated
 
 		const overview = await computeOverview(db, yearParam)
-		const scope = overview.selectedYear
+		// Public insights are cached separately so their euro-free / name-free
+		// variant never leaks into the authenticated view and vice versa.
+		const scope = isPublic
+			? `public:${overview.selectedYear}`
+			: overview.selectedYear
 
 		if (overview.empty) {
 			return NextResponse.json({
@@ -107,7 +153,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 			})
 		}
 
-		const prompt = buildPrompt(overview)
+		const prompt = buildPrompt(overview, isPublic)
 
 		const llmResponse = await fetch(MISTRAL_URL, {
 			method: 'POST',
