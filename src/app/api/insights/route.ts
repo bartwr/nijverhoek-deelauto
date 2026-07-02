@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { connectToDatabase } from '@/lib/mongodb'
 import { cookies } from 'next/headers'
 import { computeOverview, OverviewResult } from '@/lib/overview-stats'
-import { hasValidAdminOrUserSession } from '@/lib/auth-utils'
+import { canViewDetailedStats } from '@/lib/auth-utils'
 
 const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions'
 const MISTRAL_MODEL = process.env.MISTRAL_MODEL || 'mistral-small-latest'
@@ -103,8 +103,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 		const { db } = await connectToDatabase()
 		const cookieStore = await cookies()
 
-		const isAuthenticated = await hasValidAdminOrUserSession(db, cookieStore)
-		const isPublic = !isAuthenticated
+		const mayViewDetailed = await canViewDetailedStats(db, cookieStore)
+		const isPublic = !mayViewDetailed
 
 		const overview = await computeOverview(db, yearParam)
 		// Public insights are cached separately so their euro-free / name-free

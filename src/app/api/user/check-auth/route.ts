@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { connectToDatabase } from '@/lib/mongodb'
 import { cookies } from 'next/headers'
+import { User } from '@/types/models'
+import { hasCompleteUserProfile } from '@/lib/auth-utils'
 
 export async function GET(): Promise<NextResponse> {
 	try {
@@ -50,8 +52,13 @@ export async function GET(): Promise<NextResponse> {
 			path: '/'
 		})
 
+		const userRecord = await db.collection<User>('Users').findOne({
+			email_address: session.email
+		})
+
 		return NextResponse.json({
 			isLoggedIn: true,
+			canViewDetailedStats: hasCompleteUserProfile(userRecord),
 			user: {
 				email: session.email,
 				expiresAt: newExpiresAt.getTime()

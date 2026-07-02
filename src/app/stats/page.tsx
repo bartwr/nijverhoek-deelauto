@@ -190,6 +190,7 @@ const formatDateNL = (iso: string) => {
 export default function StatsPage() {
 	const [isLoggedIn, setIsLoggedIn] = useState(false)
 	const [isAdmin, setIsAdmin] = useState(false)
+	const [canViewDetailedStats, setCanViewDetailedStats] = useState(false)
 	const [user, setUser] = useState<AdminUser | null>(null)
 	const [data, setData] = useState<OverviewData | null>(null)
 	const [isLoading, setIsLoading] = useState(true)
@@ -261,8 +262,13 @@ export default function StatsPage() {
 				if (result.isLoggedIn) {
 					setIsLoggedIn(true)
 					setIsAdmin(true)
+					setCanViewDetailedStats(result.canViewDetailedStats === true)
 					setUser(result.user)
-					await loadOverview()
+					if (result.canViewDetailedStats) {
+						await loadOverview()
+					} else {
+						setIsLoading(false)
+					}
 					return
 				}
 			}
@@ -273,8 +279,13 @@ export default function StatsPage() {
 				if (result.isLoggedIn) {
 					setIsLoggedIn(true)
 					setIsAdmin(false)
+					setCanViewDetailedStats(result.canViewDetailedStats === true)
 					setUser(result.user)
-					await loadOverview()
+					if (result.canViewDetailedStats) {
+						await loadOverview()
+					} else {
+						setIsLoading(false)
+					}
 					return
 				}
 			}
@@ -327,6 +338,18 @@ export default function StatsPage() {
 
 	if (!isLoggedIn) {
 		return <PublicStats />
+	}
+
+	if (!canViewDetailedStats) {
+		return (
+			<AdminLayout
+				title={isAdmin ? 'Deelauto Nijverhoek admin' : 'Deelauto Nijverhoek'}
+				sidebarItems={sidebarItems}
+				onLogout={handleLogout}
+			>
+				<PublicStats embedded />
+			</AdminLayout>
+		)
 	}
 
 	return (

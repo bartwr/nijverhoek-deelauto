@@ -52,6 +52,7 @@ export async function GET(): Promise<NextResponse> {
 
 		return NextResponse.json({
 			isLoggedIn: true,
+			canViewDetailedStats: true,
 			user: {
 				email: session.email,
 				expiresAt: newExpiresAt.getTime()
