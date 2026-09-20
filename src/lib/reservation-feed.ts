@@ -75,7 +75,7 @@ function toCalendarEvent (reservation: DeelautoReservation): CalendarEvent {
 		uid: reservation.uid,
 		start: reservation.start,
 		end: reservation.end,
-		summary: 'Deelauto gereserveerd',
+		summary: 'Deelauto bezet',
 		description: buildDescription(reservation),
 	}
 }
