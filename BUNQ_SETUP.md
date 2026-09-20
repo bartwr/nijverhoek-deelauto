@@ -85,10 +85,23 @@ the key in the bunq app.
 ### 3. Bind the token to the server
 
 bunq binds a secret to an installation and IP address via `POST
-/device-server`. Because the secret changed, this has to be done once more:
+/device-server`, and **an installation can carry exactly one device**. Your
+existing installation is bound to the old API key, so bunq refuses a second
+device on it ("A device already exists for the current installation").
 
-- click **Registreer server-IP** in the "Bunq-koppeling" card, or
-- set `BUNQ_AUTO_REGISTER_IP=true` so it happens on first use in production.
+Click **Registreer server-IP** in the "Bunq-koppeling" card. When bunq reports
+that conflict, the app automatically:
+
+1. creates a new installation for the same RSA key pair (`POST /installation`),
+2. registers the device with the OAuth token on that installation,
+3. shows the new installation token **once**.
+
+Store that token as `BUNQ_INSTALLATION_RESPONSE_TOKEN` and redeploy. Until
+then "Test verbinding" still uses the old installation and fails.
+
+`BUNQ_AUTO_REGISTER_IP=true` only re-registers the IP on the *current*
+installation; it never creates a new one, because the app cannot update its
+own environment variables.
 
 See [IP_REGISTRATION.md](IP_REGISTRATION.md) for details.
 
@@ -149,6 +162,10 @@ The former unauthenticated debug endpoints `/api/test-bunq`,
   the flow was started in another browser. Start again from `/admin`.
 - **"Session start failed: 401"**: the token is not bound to this server IP
   yet, or was revoked. Click "Registreer server-IP" or re-authorize.
+- **"A device already exists for the current installation"**: the installation
+  is bound to a previous secret. "Registreer server-IP" creates a new
+  installation and shows its token; store it as
+  `BUNQ_INSTALLATION_RESPONSE_TOKEN` and redeploy.
 - **"BUNQ_ACCOUNT_ID_FOR_REQUESTS (...) is not among the accounts granted"**:
   either change the variable to one of the listed ids, or re-authorize with
   the right account selected.

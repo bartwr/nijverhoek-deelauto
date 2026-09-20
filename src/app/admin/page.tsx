@@ -83,6 +83,7 @@ export default function AdminPage() {
 	const [isCheckingBunq, setIsCheckingBunq] = useState(false)
 	const [isRegisteringIp, setIsRegisteringIp] = useState(false)
 	const [registerIpMessage, setRegisterIpMessage] = useState('')
+	const [newInstallationToken, setNewInstallationToken] = useState<string | null>(null)
 	const router = useRouter()
 
 	useEffect(() => {
@@ -155,14 +156,23 @@ export default function AdminPage() {
 	const handleRegisterServerIp = async () => {
 		setIsRegisteringIp(true)
 		setRegisterIpMessage('')
+		setNewInstallationToken(null)
 
 		try {
 			const response = await fetch('/api/bunq/register-ip', { method: 'POST' })
 			const data = await response.json()
 
 			if (response.ok && data.success) {
-				setRegisterIpMessage(`Server-IP ${data.ipAddress} geregistreerd bij bunq`)
-				await loadBunqStatus()
+				if (data.newInstallationToken) {
+					setNewInstallationToken(data.newInstallationToken)
+					setRegisterIpMessage(
+						`Server-IP ${data.ipAddress} geregistreerd op een nieuwe bunq-installatie. ` +
+						'Zet het token hieronder als BUNQ_INSTALLATION_RESPONSE_TOKEN en deploy opnieuw.'
+					)
+				} else {
+					setRegisterIpMessage(`Server-IP ${data.ipAddress} geregistreerd bij bunq`)
+					await loadBunqStatus()
+				}
 			} else {
 				setRegisterIpMessage(`Error: ${data.message || data.error || 'IP-registratie mislukt'}`)
 			}
@@ -488,6 +498,24 @@ export default function AdminPage() {
 								: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
 						}`}>
 							{registerIpMessage}
+						</div>
+					)}
+
+					{newInstallationToken && (
+						<div className="mt-4">
+							<label htmlFor="newInstallationToken" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+								Nieuw BUNQ_INSTALLATION_RESPONSE_TOKEN (wordt maar één keer getoond)
+							</label>
+							<textarea
+								id="newInstallationToken"
+								readOnly
+								rows={3}
+								value={newInstallationToken}
+								className="w-full rounded-lg px-4 py-3 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 font-mono text-xs break-all"
+							/>
+							<p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+								Zolang de oude installatietoken in de omgeving staat, mislukt &quot;Test verbinding&quot; nog.
+							</p>
 						</div>
 					)}
 

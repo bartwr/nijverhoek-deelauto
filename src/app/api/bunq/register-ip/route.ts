@@ -8,6 +8,10 @@ export const dynamic = 'force-dynamic'
 /**
  * Registers the server's public IP address with bunq (device-server) so the
  * OAuth access token may be used from this server. Admin only.
+ *
+ * If the current installation already carries a device (bound to the old
+ * secret), a new installation is created and its token is returned once so
+ * the admin can store it as `BUNQ_INSTALLATION_RESPONSE_TOKEN`.
  */
 export async function POST (): Promise<NextResponse> {
 	if (!await hasValidAdminSession()) {
@@ -18,15 +22,20 @@ export async function POST (): Promise<NextResponse> {
 		console.log('IP registration request received')
 		
 		// Register the server's IP address with bunq
-		const result = await registerBunqServerIp()
+		const result = await registerBunqServerIp({ allowNewInstallation: true })
 		
-		console.log('IP registration result:', result)
+		console.log('IP registration result:', {
+			success: result.success,
+			ipAddress: result.ipAddress,
+			createdNewInstallation: result.newInstallationToken !== undefined
+		})
 
 		if (result.success) {
 			return NextResponse.json({
 				success: true,
 				ipAddress: result.ipAddress,
-				message: result.message
+				message: result.message,
+				newInstallationToken: result.newInstallationToken
 			})
 		} else {
 			return NextResponse.json({

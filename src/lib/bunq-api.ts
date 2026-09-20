@@ -113,6 +113,20 @@ export interface BunqMonetaryAccountSummary {
 	status: string
 }
 
+/**
+ * Outcome of registering this server with bunq (POST /device-server).
+ */
+export interface BunqIpRegistrationResult {
+	success: boolean
+	ipAddress: string
+	message: string
+	/**
+	 * Present when a fresh installation had to be created. Must be stored as
+	 * `BUNQ_INSTALLATION_RESPONSE_TOKEN`; it is never logged or persisted.
+	 */
+	newInstallationToken?: string
+}
+
 export interface BunqApiContext {
 	sessionToken: string
 	/**
@@ -363,6 +377,48 @@ class BunqApiClient {
 
 
 	/**
+	 * Normalise the configured private key into PEM. Accepts a PEM string, a
+	 * PEM string with escaped `\n`, or a base64-encoded PEM string.
+	 */
+	private getFormattedPrivateKey(): string {
+		if (!this.privateKey) {
+			throw new Error('Private key not initialized')
+		}
+
+		let formattedPrivateKey = this.privateKey
+
+		// Handle different private key formats
+		if (this.privateKey.includes('\\n')) {
+			// Fix escaped newlines in private key (common issue with environment variables)
+			formattedPrivateKey = this.privateKey.replace(/\\n/g, '\n')
+		} else if (!this.privateKey.includes('\n') && !this.privateKey.startsWith('-----BEGIN')) {
+			// If it's a base64 encoded key without proper formatting, decode it
+			try {
+				formattedPrivateKey = Buffer.from(this.privateKey, 'base64').toString('utf-8')
+			} catch {
+				// If base64 decoding fails, assume it's already in the correct format
+				console.log('Private key is not base64 encoded, using as-is')
+			}
+		}
+
+		// Ensure the key has proper PEM headers if missing
+		if (!formattedPrivateKey.includes('-----BEGIN')) {
+			console.warn('Private key missing PEM headers, this may cause issues')
+		}
+
+		return formattedPrivateKey
+	}
+
+	/**
+	 * Derive the SPKI PEM public key that belongs to the configured private
+	 * key. This is the `client_public_key` bunq expects on POST /installation.
+	 */
+	private getClientPublicKeyPem(): string {
+		const publicKey = crypto.createPublicKey(this.getFormattedPrivateKey())
+		return publicKey.export({ type: 'spki', format: 'pem' }).toString()
+	}
+
+	/**
 	 * Create a signature for bunq API requests using the private key
 	 */
 	private createSignature(data: string): string {
@@ -371,26 +427,7 @@ class BunqApiClient {
 		}
 
 		try {
-			let formattedPrivateKey = this.privateKey
-
-			// Handle different private key formats
-			if (this.privateKey.includes('\\n')) {
-				// Fix escaped newlines in private key (common issue with environment variables)
-				formattedPrivateKey = this.privateKey.replace(/\\n/g, '\n')
-			} else if (!this.privateKey.includes('\n') && !this.privateKey.startsWith('-----BEGIN')) {
-				// If it's a base64 encoded key without proper formatting, decode it
-				try {
-					formattedPrivateKey = Buffer.from(this.privateKey, 'base64').toString('utf-8')
-				} catch {
-					// If base64 decoding fails, assume it's already in the correct format
-					console.log('Private key is not base64 encoded, using as-is')
-				}
-			}
-
-			// Ensure the key has proper PEM headers if missing
-			if (!formattedPrivateKey.includes('-----BEGIN')) {
-				console.warn('Private key missing PEM headers, this may cause issues')
-			}
+			const formattedPrivateKey = this.getFormattedPrivateKey()
 			
 			// Create SHA256 signature using the private key
 			const sign = crypto.createSign('SHA256')
@@ -909,9 +946,99 @@ class BunqApiClient {
 	}
 
 	/**
-	 * Register the server's IP address with bunq API for device-server
+	 * Create a new bunq installation for the configured RSA key pair.
+	 *
+	 * An installation can carry exactly one device-server. When the secret
+	 * changes (for example: API key replaced by an OAuth access token) bunq
+	 * refuses a second device on the old installation, so a fresh installation
+	 * is needed. POST /installation is unauthenticated.
 	 */
-	async registerServerIpAddress(): Promise<{ success: boolean; ipAddress: string; message: string }> {
+	private async createInstallation(): Promise<string> {
+		const clientPublicKey = this.getClientPublicKeyPem()
+
+		console.log('Creating new bunq installation...')
+		const response = await fetch(`${this.baseUrl}/v1/installation`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'User-Agent': 'nijverhoek-deelauto/1.0',
+				'X-Bunq-Client-Request-Id': this.generateRequestId()
+			},
+			body: JSON.stringify({ client_public_key: clientPublicKey })
+		})
+
+		if (!response.ok) {
+			const errorText = await response.text()
+			throw new Error(`Installation creation failed: ${response.status} ${response.statusText} - ${errorText}`)
+		}
+
+		const data = await response.json() as BunqApiResponse
+		const token = data.Response?.find(item => item.Token)?.Token?.token
+		if (!token) {
+			throw new Error('Installation token not found in installation response')
+		}
+
+		console.log('New bunq installation created')
+		return token
+	}
+
+	/**
+	 * POST /device-server: bind the OAuth access token to the given
+	 * installation and this server's IP address.
+	 */
+	private async createDeviceServer(installationToken: string, ipAddress: string): Promise<void> {
+		if (!this.accessToken) {
+			throw new Error('BUNQ_OAUTH_ACCESS_TOKEN environment variable is required')
+		}
+
+		// The OAuth access token is the secret bound to this installation and IP.
+		const requestBody = {
+			description: 'Nijverhoek Deelauto',
+			secret: this.accessToken,
+			permitted_ips: [ipAddress]
+		}
+
+		console.log('Registering device-server with bunq API...')
+		const response = await fetch(`${this.baseUrl}/v1/device-server`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'User-Agent': 'nijverhoek-deelauto/1.0',
+				'X-Bunq-Client-Request-Id': this.generateRequestId(),
+				'X-Bunq-Client-Authentication': installationToken
+			},
+			body: JSON.stringify(requestBody)
+		})
+
+		if (!response.ok) {
+			const errorText = await response.text()
+			console.error('Device-server registration failed:', {
+				status: response.status,
+				statusText: response.statusText,
+				errorBody: errorText
+			})
+
+			const error = new Error(`Device-server registration failed: ${response.status} ${response.statusText} - ${errorText}`)
+			if (errorText.includes('A device already exists for the current installation')) {
+				error.name = 'BunqDeviceAlreadyExistsError'
+			}
+			throw error
+		}
+
+		console.log('Device-server registration successful')
+	}
+
+	/**
+	 * Register the server's IP address with bunq API for device-server.
+	 *
+	 * When `allowNewInstallation` is true and the current installation already
+	 * has a device (bound to a previous secret), a new installation is created
+	 * and the device is registered on that one. The caller must then store the
+	 * returned `newInstallationToken` as `BUNQ_INSTALLATION_RESPONSE_TOKEN`.
+	 */
+	async registerServerIpAddress(
+		options: { allowNewInstallation?: boolean } = {}
+	): Promise<BunqIpRegistrationResult> {
 		try {
 			// Initialize environment variables
 			this.initializeEnvironment()
@@ -925,44 +1052,30 @@ class BunqApiClient {
 				throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is required')
 			}
 
-			if (!this.accessToken) {
-				throw new Error('BUNQ_OAUTH_ACCESS_TOKEN environment variable is required')
+			try {
+				await this.createDeviceServer(installationToken, ipAddress)
+			} catch (error) {
+				const isDeviceConflict = error instanceof Error && error.name === 'BunqDeviceAlreadyExistsError'
+				if (!isDeviceConflict || !options.allowNewInstallation) {
+					throw error
+				}
+
+				console.warn('Installation already has a device; creating a new installation for the OAuth token')
+				const newInstallationToken = await this.createInstallation()
+				await this.createDeviceServer(newInstallationToken, ipAddress)
+
+				// Forget any session built on the old installation.
+				this.context = null
+
+				return {
+					success: true,
+					ipAddress,
+					newInstallationToken,
+					message:
+						`Registered IP address ${ipAddress} on a new bunq installation. ` +
+						'Store the new installation token as BUNQ_INSTALLATION_RESPONSE_TOKEN and redeploy.'
+				}
 			}
-
-			// Prepare the device-server registration request. The OAuth access
-			// token is the secret bound to this installation and IP address.
-			const requestBody = {
-				description: 'Nijverhoek Deelauto',
-				secret: this.accessToken,
-				permitted_ips: [ipAddress]
-			}
-
-			const requestBodyString = JSON.stringify(requestBody)
-
-			console.log('Registering device-server with bunq API...')
-			const response = await fetch(`${this.baseUrl}/v1/device-server`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'User-Agent': 'nijverhoek-deelauto/1.0',
-					'X-Bunq-Client-Authentication': installationToken
-				},
-				body: requestBodyString
-			})
-
-			if (!response.ok) {
-				const errorText = await response.text()
-				console.error('Device-server registration failed:', {
-					status: response.status,
-					statusText: response.statusText,
-					errorBody: errorText
-				})
-				
-				throw new Error(`Device-server registration failed: ${response.status} ${response.statusText} - ${errorText}`)
-			}
-
-			const responseData = await response.json()
-			console.log('Device-server registration successful:', JSON.stringify(responseData, null, 2))
 
 			return {
 				success: true,
@@ -1114,8 +1227,13 @@ export async function checkBunqPaymentStatus(requestId: number, isBunqUserReques
 }
 
 /**
- * Helper function to register server IP address with bunq API
+ * Helper function to register server IP address with bunq API.
+ *
+ * Pass `allowNewInstallation: true` (admin-triggered only) to let the client
+ * create a fresh installation when the current one already has a device.
  */
-export async function registerBunqServerIp(): Promise<{ success: boolean; ipAddress: string; message: string }> {
-	return await bunqApi.registerServerIpAddress()
+export async function registerBunqServerIp(
+	options: { allowNewInstallation?: boolean } = {}
+): Promise<BunqIpRegistrationResult> {
+	return await bunqApi.registerServerIpAddress(options)
 }
