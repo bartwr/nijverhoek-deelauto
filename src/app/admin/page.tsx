@@ -1,12 +1,22 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 
 interface AdminUser {
 	email: string
 	expiresAt: number
+}
+
+interface ReservationFeedStatus {
+	success: boolean
+	feedUrl: string | null
+	reservationCount?: number
+	generatedAt?: string
+	firstStart?: string | null
+	lastEnd?: string | null
+	error?: string
 }
 
 export default function AdminPage() {
@@ -38,12 +48,49 @@ export default function AdminPage() {
 </html>`)
 	const [emailMessage, setEmailMessage] = useState('')
 	const [isSendingEmail, setIsSendingEmail] = useState(false)
+	const [feedStatus, setFeedStatus] = useState<ReservationFeedStatus | null>(null)
+	const [isCheckingFeed, setIsCheckingFeed] = useState(false)
+	const [isFeedUrlCopied, setIsFeedUrlCopied] = useState(false)
 	const router = useRouter()
 
 	useEffect(() => {
 		// Check if user is logged in on component mount
 		checkAuthStatus()
 	}, [])
+
+	const loadFeedStatus = useCallback(async (forceRefresh = false) => {
+		setIsCheckingFeed(true)
+
+		try {
+			const response = await fetch(
+				`/api/admin/reservation-feed${forceRefresh ? '?refresh=1' : ''}`
+			)
+
+			if (!response.ok) {
+				setFeedStatus({
+					success: false,
+					feedUrl: null,
+					error: 'Kon de feedstatus niet ophalen'
+				})
+				return
+			}
+
+			setFeedStatus(await response.json())
+		} catch (error) {
+			console.error('Error loading reservation feed status:', error)
+			setFeedStatus({
+				success: false,
+				feedUrl: null,
+				error: 'Kon de feedstatus niet ophalen'
+			})
+		} finally {
+			setIsCheckingFeed(false)
+		}
+	}, [])
+
+	useEffect(() => {
+		if (isLoggedIn) loadFeedStatus()
+	}, [isLoggedIn, loadFeedStatus])
 
 	const checkAuthStatus = async () => {
 		try {
@@ -127,6 +174,31 @@ export default function AdminPage() {
 		} finally {
 			setIsSyncing(false)
 		}
+	}
+
+	const handleCopyFeedUrl = async () => {
+		if (!feedStatus?.feedUrl) return
+
+		try {
+			await navigator.clipboard.writeText(feedStatus.feedUrl)
+			setIsFeedUrlCopied(true)
+			setTimeout(() => setIsFeedUrlCopied(false), 2000)
+		} catch (error) {
+			console.error('Error copying feed URL:', error)
+		}
+	}
+
+	const formatFeedDate = (value: string | null | undefined): string => {
+		if (!value) return '-'
+
+		return new Date(value).toLocaleString('nl-NL', {
+			timeZone: 'Europe/Amsterdam',
+			day: '2-digit',
+			month: '2-digit',
+			year: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		})
 	}
 
 	const handleSendEmail = async (e: React.FormEvent) => {
@@ -229,6 +301,88 @@ export default function AdminPage() {
 								: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
 						}`}>
 							{syncMessage}
+						</div>
+					)}
+				</div>
+
+				<div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700 mt-6">
+					<div className="flex items-center space-x-2 mb-4">
+						<svg className="w-6 h-6 text-[#ea5c33]" fill="currentColor" viewBox="0 0 20 20">
+							<path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+						</svg>
+						<h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+							Agenda-feed reserveringen
+						</h3>
+					</div>
+					<p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
+						Abonneer je agenda op deze link om alle reserveringen van de deelauto te zien. De reserveringen komen live uit de Deelauto (TMF) API.
+					</p>
+
+					{feedStatus?.feedUrl && (
+						<div className="mb-4">
+							<label htmlFor="feedUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+								Feed-URL (deel alleen met mede-gebruikers)
+							</label>
+							<div className="flex flex-col sm:flex-row gap-2">
+								<input
+									id="feedUrl"
+									type="text"
+									readOnly
+									value={feedStatus.feedUrl}
+									className="flex-1 rounded-lg px-4 py-3 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 font-mono text-xs"
+								/>
+								<button
+									type="button"
+									onClick={handleCopyFeedUrl}
+									className="px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+								>
+									{isFeedUrlCopied ? 'Gekopieerd' : 'Kopieer'}
+								</button>
+							</div>
+						</div>
+					)}
+
+					{feedStatus?.success && (
+						<dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 text-sm">
+							<div>
+								<dt className="text-gray-500 dark:text-gray-400">Reserveringen</dt>
+								<dd className="text-gray-900 dark:text-gray-100 font-medium">{feedStatus.reservationCount}</dd>
+							</div>
+							<div>
+								<dt className="text-gray-500 dark:text-gray-400">Eerste start</dt>
+								<dd className="text-gray-900 dark:text-gray-100 font-medium">{formatFeedDate(feedStatus.firstStart)}</dd>
+							</div>
+							<div>
+								<dt className="text-gray-500 dark:text-gray-400">Laatste einde</dt>
+								<dd className="text-gray-900 dark:text-gray-100 font-medium">{formatFeedDate(feedStatus.lastEnd)}</dd>
+							</div>
+						</dl>
+					)}
+
+					<button
+						onClick={() => loadFeedStatus(true)}
+						disabled={isCheckingFeed}
+						className="inline-flex items-center space-x-2 px-6 py-3 bg-[#ea5c33] hover:bg-[#ea5c33]/90 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors cursor-pointer"
+					>
+						{isCheckingFeed ? (
+							<>
+								<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+								<span>Controleren...</span>
+							</>
+						) : (
+							<span>Test verbinding</span>
+						)}
+					</button>
+
+					{feedStatus && !feedStatus.success && feedStatus.error && (
+						<div className="mt-4 p-3 rounded-lg text-sm bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400">
+							{feedStatus.error}
+						</div>
+					)}
+
+					{feedStatus?.success && feedStatus.generatedAt && (
+						<div className="mt-4 p-3 rounded-lg text-sm bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400">
+							Feed bijgewerkt op {formatFeedDate(feedStatus.generatedAt)}
 						</div>
 					)}
 				</div>
