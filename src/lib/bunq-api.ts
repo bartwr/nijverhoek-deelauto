@@ -114,12 +114,33 @@ export interface BunqMonetaryAccountSummary {
 }
 
 /**
+ * Which `permitted_ips` strategy bunq accepted when registering the device.
+ * - `wildcard`: `[ip, '*']`, calls allowed from any IP address.
+ * - `calling-ip`: `permitted_ips` omitted, bunq bound the IP it saw.
+ * - `detected-ip`: only the externally detected IP address.
+ */
+export type BunqDeviceIpMode = 'wildcard' | 'calling-ip' | 'detected-ip'
+
+function describeIpMode (mode: BunqDeviceIpMode, detectedIp: string): string {
+	switch (mode) {
+		case 'wildcard':
+			return 'all IP addresses allowed'
+		case 'calling-ip':
+			return 'bound to the IP address bunq saw on the request'
+		case 'detected-ip':
+			return `bound to IP address ${detectedIp}`
+	}
+}
+
+/**
  * Outcome of registering this server with bunq (POST /device-server).
  */
 export interface BunqIpRegistrationResult {
 	success: boolean
 	ipAddress: string
 	message: string
+	/** Strategy that succeeded; absent on failure. */
+	ipMode?: BunqDeviceIpMode
 	/**
 	 * Present when a fresh installation had to be created. Must be stored as
 	 * `BUNQ_INSTALLATION_RESPONSE_TOKEN`; it is never logged or persisted.
@@ -273,8 +294,8 @@ class BunqApiClient {
 	private initializeEnvironment(): void {
 		if (this.initialized) return
 
-		this.accessToken = process.env.BUNQ_OAUTH_ACCESS_TOKEN || ''
-		this.privateKey = process.env.BUNQ_PRIVATE_KEY_FOR_SIGNING || ''
+		this.accessToken = (process.env.BUNQ_OAUTH_ACCESS_TOKEN || '').trim()
+		this.privateKey = (process.env.BUNQ_PRIVATE_KEY_FOR_SIGNING || '').trim()
 		
 		console.log('BunqApiClient initialized with:', {
 			baseUrl: this.baseUrl,
@@ -454,7 +475,7 @@ class BunqApiClient {
 	 * Start session using pre-configured installation token
 	 */
 	private async startSession(): Promise<BunqApiResponse> {
-		const installationToken = process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN
+		const installationToken = (process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN || '').trim()
 		
 		if (!installationToken) {
 			throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is not set')
@@ -984,21 +1005,26 @@ class BunqApiClient {
 
 	/**
 	 * POST /device-server: bind the OAuth access token to the given
-	 * installation and this server's IP address.
+	 * installation. `permittedIps` is sent as-is; when omitted bunq binds the
+	 * device to the IP address it sees on this request.
 	 */
-	private async createDeviceServer(installationToken: string, ipAddress: string): Promise<void> {
+	private async createDeviceServer(installationToken: string, permittedIps?: string[]): Promise<void> {
 		if (!this.accessToken) {
 			throw new Error('BUNQ_OAUTH_ACCESS_TOKEN environment variable is required')
 		}
 
-		// The OAuth access token is the secret bound to this installation and IP.
-		const requestBody = {
+		// The OAuth access token is the secret bound to this installation.
+		const requestBody: { description: string; secret: string; permitted_ips?: string[] } = {
 			description: 'Nijverhoek Deelauto',
-			secret: this.accessToken,
-			permitted_ips: [ipAddress]
+			secret: this.accessToken
+		}
+		if (permittedIps) {
+			requestBody.permitted_ips = permittedIps
 		}
 
-		console.log('Registering device-server with bunq API...')
+		console.log('Registering device-server with bunq API...', {
+			permittedIps: permittedIps ?? '(calling IP, chosen by bunq)'
+		})
 		const response = await fetch(`${this.baseUrl}/v1/device-server`, {
 			method: 'POST',
 			headers: {
@@ -1021,11 +1047,66 @@ class BunqApiClient {
 			const error = new Error(`Device-server registration failed: ${response.status} ${response.statusText} - ${errorText}`)
 			if (errorText.includes('A device already exists for the current installation')) {
 				error.name = 'BunqDeviceAlreadyExistsError'
+			} else if (errorText.includes('Incorrect API key or IP address')) {
+				error.name = 'BunqCredentialsOrIpError'
 			}
 			throw error
 		}
 
 		console.log('Device-server registration successful')
+	}
+
+	/**
+	 * Register the device trying several `permitted_ips` strategies.
+	 *
+	 * On platforms with rotating egress addresses (Vercel) the IP detected via
+	 * an external service is not necessarily the IP bunq sees, and bunq then
+	 * answers "Incorrect API key or IP address". Order of attempts:
+	 *
+	 * 1. `[detectedIp, '*']`: wildcard, IP-independent (skipped when
+	 *    `BUNQ_ALLOW_ALL_IPS=false`).
+	 * 2. `permitted_ips` omitted: bunq binds the IP it sees on the request.
+	 * 3. `[detectedIp]`: the previous behaviour.
+	 *
+	 * A "device already exists" error is rethrown immediately since retrying
+	 * cannot help. Returns the strategy that succeeded.
+	 */
+	private async createDeviceServerWithIpFallbacks(
+		installationToken: string,
+		detectedIp: string
+	): Promise<BunqDeviceIpMode> {
+		const allowWildcard = (process.env.BUNQ_ALLOW_ALL_IPS ?? 'true').trim().toLowerCase() !== 'false'
+		const hasDetectedIp = detectedIp !== 'Unknown'
+
+		const attempts: Array<{ mode: BunqDeviceIpMode; permittedIps?: string[] }> = []
+		if (allowWildcard) {
+			attempts.push({ mode: 'wildcard', permittedIps: hasDetectedIp ? [detectedIp, '*'] : ['*'] })
+		}
+		attempts.push({ mode: 'calling-ip' })
+		if (hasDetectedIp) {
+			attempts.push({ mode: 'detected-ip', permittedIps: [detectedIp] })
+		}
+
+		const failures: string[] = []
+		for (const attempt of attempts) {
+			try {
+				await this.createDeviceServer(installationToken, attempt.permittedIps)
+				return attempt.mode
+			} catch (error) {
+				if (error instanceof Error && error.name === 'BunqDeviceAlreadyExistsError') {
+					throw error
+				}
+				const message = error instanceof Error ? error.message : 'Unknown error'
+				console.warn(`Device-server attempt "${attempt.mode}" failed: ${message}`)
+				failures.push(`${attempt.mode}: ${message}`)
+			}
+		}
+
+		throw new Error(
+			'All device-server attempts failed. If every attempt reports "Incorrect API key or IP address" ' +
+			'the access token itself is most likely wrong (re-run the OAuth flow) or issued for the other ' +
+			`environment (sandbox vs production). Details: ${failures.join(' | ')}`
+		)
 	}
 
 	/**
@@ -1047,13 +1128,14 @@ class BunqApiClient {
 			const ipAddress = await getExternalIpAddress()
 			console.log(`Registering IP address with bunq: ${ipAddress}`)
 
-			const installationToken = process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN
+			const installationToken = (process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN || '').trim()
 			if (!installationToken) {
 				throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is required')
 			}
 
+			let ipMode: BunqDeviceIpMode
 			try {
-				await this.createDeviceServer(installationToken, ipAddress)
+				ipMode = await this.createDeviceServerWithIpFallbacks(installationToken, ipAddress)
 			} catch (error) {
 				const isDeviceConflict = error instanceof Error && error.name === 'BunqDeviceAlreadyExistsError'
 				if (!isDeviceConflict || !options.allowNewInstallation) {
@@ -1062,7 +1144,7 @@ class BunqApiClient {
 
 				console.warn('Installation already has a device; creating a new installation for the OAuth token')
 				const newInstallationToken = await this.createInstallation()
-				await this.createDeviceServer(newInstallationToken, ipAddress)
+				const newIpMode = await this.createDeviceServerWithIpFallbacks(newInstallationToken, ipAddress)
 
 				// Forget any session built on the old installation.
 				this.context = null
@@ -1070,9 +1152,10 @@ class BunqApiClient {
 				return {
 					success: true,
 					ipAddress,
+					ipMode: newIpMode,
 					newInstallationToken,
 					message:
-						`Registered IP address ${ipAddress} on a new bunq installation. ` +
+						`Registered device (${describeIpMode(newIpMode, ipAddress)}) on a new bunq installation. ` +
 						'Store the new installation token as BUNQ_INSTALLATION_RESPONSE_TOKEN and redeploy.'
 				}
 			}
@@ -1080,7 +1163,8 @@ class BunqApiClient {
 			return {
 				success: true,
 				ipAddress,
-				message: `Successfully registered IP address ${ipAddress} with bunq API`
+				ipMode,
+				message: `Registered device with bunq (${describeIpMode(ipMode, ipAddress)})`
 			}
 
 		} catch (error) {

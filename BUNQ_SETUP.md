@@ -54,6 +54,10 @@ NEXT_PUBLIC_BASE_URL=https://auto.nijverhoek.nl
 
 # Optional: re-register the server IP on first use in production
 BUNQ_AUTO_REGISTER_IP=true
+
+# Optional: set to "false" to forbid the IP wildcard when registering the
+# device. Only do this on a host with a fixed egress IP. See IP_REGISTRATION.md
+BUNQ_ALLOW_ALL_IPS=true
 ```
 
 `BUNQ_API_KEY` is no longer read. Remove it from your environment and revoke
@@ -166,6 +170,12 @@ The former unauthenticated debug endpoints `/api/test-bunq`,
   is bound to a previous secret. "Registreer server-IP" creates a new
   installation and shows its token; store it as
   `BUNQ_INSTALLATION_RESPONSE_TOKEN` and redeploy.
+- **"User credentials are incorrect. Incorrect API key or IP address"** on
+  device registration: either the calling IP was not in `permitted_ips` (the
+  app now retries with a wildcard and with bunq's own view of the IP, see
+  [IP_REGISTRATION.md](IP_REGISTRATION.md)), or the access token is wrong or
+  belongs to the other environment. If all retries fail, re-run the OAuth
+  flow.
 - **"BUNQ_ACCOUNT_ID_FOR_REQUESTS (...) is not among the accounts granted"**:
   either change the variable to one of the listed ids, or re-authorize with
   the right account selected.

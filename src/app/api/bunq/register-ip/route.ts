@@ -27,6 +27,7 @@ export async function POST (): Promise<NextResponse> {
 		console.log('IP registration result:', {
 			success: result.success,
 			ipAddress: result.ipAddress,
+			ipMode: result.ipMode,
 			createdNewInstallation: result.newInstallationToken !== undefined
 		})
 
@@ -34,6 +35,7 @@ export async function POST (): Promise<NextResponse> {
 			return NextResponse.json({
 				success: true,
 				ipAddress: result.ipAddress,
+				ipMode: result.ipMode,
 				message: result.message,
 				newInstallationToken: result.newInstallationToken
 			})

@@ -163,14 +163,20 @@ export default function AdminPage() {
 			const data = await response.json()
 
 			if (response.ok && data.success) {
+				const ipModeLabel = data.ipMode === 'wildcard'
+					? 'alle IP-adressen toegestaan'
+					: data.ipMode === 'calling-ip'
+						? 'gekoppeld aan het IP-adres dat bunq zag'
+						: `gekoppeld aan IP ${data.ipAddress}`
+
 				if (data.newInstallationToken) {
 					setNewInstallationToken(data.newInstallationToken)
 					setRegisterIpMessage(
-						`Server-IP ${data.ipAddress} geregistreerd op een nieuwe bunq-installatie. ` +
+						`Apparaat geregistreerd (${ipModeLabel}) op een nieuwe bunq-installatie. ` +
 						'Zet het token hieronder als BUNQ_INSTALLATION_RESPONSE_TOKEN en deploy opnieuw.'
 					)
 				} else {
-					setRegisterIpMessage(`Server-IP ${data.ipAddress} geregistreerd bij bunq`)
+					setRegisterIpMessage(`Apparaat geregistreerd bij bunq (${ipModeLabel})`)
 					await loadBunqStatus()
 				}
 			} else {
