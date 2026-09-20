@@ -19,6 +19,34 @@ interface ReservationFeedStatus {
 	error?: string
 }
 
+interface BunqAccountSummary {
+	id: number
+	type: string
+	description: string
+	iban: string | null
+	status: string
+}
+
+interface BunqStatus {
+	success: boolean
+	config: {
+		hasClientId: boolean
+		hasClientSecret: boolean
+		hasAccessToken: boolean
+		hasInstallationToken: boolean
+		hasPrivateKey: boolean
+		configuredAccountId: string | null
+		isSandbox: boolean
+	}
+	redirectUri: string
+	connection?: {
+		userId: number
+		pinnedAccount: BunqAccountSummary
+		grantedAccounts: BunqAccountSummary[]
+	}
+	error?: string
+}
+
 export default function AdminPage() {
 	const [isLoggedIn, setIsLoggedIn] = useState(false)
 	const [user, setUser] = useState<AdminUser | null>(null)
@@ -51,6 +79,10 @@ export default function AdminPage() {
 	const [feedStatus, setFeedStatus] = useState<ReservationFeedStatus | null>(null)
 	const [isCheckingFeed, setIsCheckingFeed] = useState(false)
 	const [isFeedUrlCopied, setIsFeedUrlCopied] = useState(false)
+	const [bunqStatus, setBunqStatus] = useState<BunqStatus | null>(null)
+	const [isCheckingBunq, setIsCheckingBunq] = useState(false)
+	const [isRegisteringIp, setIsRegisteringIp] = useState(false)
+	const [registerIpMessage, setRegisterIpMessage] = useState('')
 	const router = useRouter()
 
 	useEffect(() => {
@@ -88,9 +120,59 @@ export default function AdminPage() {
 		}
 	}, [])
 
+	const loadBunqStatus = useCallback(async () => {
+		setIsCheckingBunq(true)
+
+		try {
+			const response = await fetch('/api/admin/bunq/status')
+			const data = await response.json() as BunqStatus
+
+			if (!response.ok) {
+				setBunqStatus({
+					...data,
+					success: false,
+					error: data.error || 'Kon de bunq-status niet ophalen'
+				})
+				return
+			}
+
+			setBunqStatus(data)
+		} catch (error) {
+			console.error('Error loading bunq status:', error)
+			setBunqStatus(null)
+		} finally {
+			setIsCheckingBunq(false)
+		}
+	}, [])
+
 	useEffect(() => {
-		if (isLoggedIn) loadFeedStatus()
-	}, [isLoggedIn, loadFeedStatus])
+		if (isLoggedIn) {
+			loadFeedStatus()
+			loadBunqStatus()
+		}
+	}, [isLoggedIn, loadFeedStatus, loadBunqStatus])
+
+	const handleRegisterServerIp = async () => {
+		setIsRegisteringIp(true)
+		setRegisterIpMessage('')
+
+		try {
+			const response = await fetch('/api/bunq/register-ip', { method: 'POST' })
+			const data = await response.json()
+
+			if (response.ok && data.success) {
+				setRegisterIpMessage(`Server-IP ${data.ipAddress} geregistreerd bij bunq`)
+				await loadBunqStatus()
+			} else {
+				setRegisterIpMessage(`Error: ${data.message || data.error || 'IP-registratie mislukt'}`)
+			}
+		} catch (error) {
+			console.error('Error registering server IP:', error)
+			setRegisterIpMessage('Error: IP-registratie mislukt')
+		} finally {
+			setIsRegisteringIp(false)
+		}
+	}
 
 	const checkAuthStatus = async () => {
 		try {
@@ -301,6 +383,123 @@ export default function AdminPage() {
 								: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
 						}`}>
 							{syncMessage}
+						</div>
+					)}
+				</div>
+
+				<div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700 mt-6">
+					<div className="flex items-center space-x-2 mb-4">
+						<svg className="w-6 h-6 text-[#ea5c33]" fill="currentColor" viewBox="0 0 20 20">
+							<path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+						</svg>
+						<h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+							Bunq-koppeling
+						</h3>
+					</div>
+					<p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
+						De app gebruikt een bunq OAuth-token dat alleen toegang heeft tot de geselecteerde
+						rekening en geen geld naar derden kan overmaken. Koppel het account eenmalig via
+						de bunq-app; het token zet je daarna als omgevingsvariabele.
+					</p>
+
+					{bunqStatus && (
+						<dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm">
+							<div>
+								<dt className="text-gray-500 dark:text-gray-400">OAuth-client (id + secret)</dt>
+								<dd className="text-gray-900 dark:text-gray-100 font-medium">
+									{bunqStatus.config.hasClientId && bunqStatus.config.hasClientSecret ? 'Ingesteld' : 'Ontbreekt'}
+								</dd>
+							</div>
+							<div>
+								<dt className="text-gray-500 dark:text-gray-400">Access token</dt>
+								<dd className="text-gray-900 dark:text-gray-100 font-medium">
+									{bunqStatus.config.hasAccessToken ? 'Ingesteld' : 'Ontbreekt'}
+									{bunqStatus.config.isSandbox ? ' (sandbox)' : ''}
+								</dd>
+							</div>
+							<div>
+								<dt className="text-gray-500 dark:text-gray-400">Vastgezette rekening</dt>
+								<dd className="text-gray-900 dark:text-gray-100 font-medium">
+									{bunqStatus.connection
+										? `${bunqStatus.connection.pinnedAccount.description || 'Rekening'} (#${bunqStatus.connection.pinnedAccount.id}${bunqStatus.connection.pinnedAccount.iban ? `, ${bunqStatus.connection.pinnedAccount.iban}` : ''})`
+										: bunqStatus.config.configuredAccountId
+											? `#${bunqStatus.config.configuredAccountId} (niet geverifieerd)`
+											: '-'}
+								</dd>
+							</div>
+							<div>
+								<dt className="text-gray-500 dark:text-gray-400">Rekeningen in de OAuth-toestemming</dt>
+								<dd className="text-gray-900 dark:text-gray-100 font-medium">
+									{bunqStatus.connection
+										? bunqStatus.connection.grantedAccounts.map(account => `#${account.id}`).join(', ')
+										: '-'}
+								</dd>
+							</div>
+							<div className="sm:col-span-2">
+								<dt className="text-gray-500 dark:text-gray-400">Redirect-URL voor de OAuth-client in de bunq-app</dt>
+								<dd className="text-gray-900 dark:text-gray-100 font-mono text-xs break-all">{bunqStatus.redirectUri}</dd>
+							</div>
+						</dl>
+					)}
+
+					<div className="flex flex-col sm:flex-row gap-2">
+						<a
+							href="/api/admin/bunq/oauth/start"
+							className="inline-flex items-center justify-center space-x-2 px-6 py-3 bg-[#ea5c33] hover:bg-[#ea5c33]/90 text-white font-medium rounded-lg transition-colors cursor-pointer"
+						>
+							<span>Koppel bunq-account</span>
+						</a>
+						<button
+							type="button"
+							onClick={handleRegisterServerIp}
+							disabled={isRegisteringIp || !bunqStatus?.config.hasAccessToken}
+							className="inline-flex items-center justify-center space-x-2 px-6 py-3 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors cursor-pointer"
+						>
+							{isRegisteringIp ? (
+								<>
+									<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+									<span>Registreren...</span>
+								</>
+							) : (
+								<span>Registreer server-IP</span>
+							)}
+						</button>
+						<button
+							type="button"
+							onClick={loadBunqStatus}
+							disabled={isCheckingBunq}
+							className="inline-flex items-center justify-center space-x-2 px-6 py-3 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors cursor-pointer"
+						>
+							{isCheckingBunq ? (
+								<>
+									<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+									<span>Controleren...</span>
+								</>
+							) : (
+								<span>Test verbinding</span>
+							)}
+						</button>
+					</div>
+
+					{registerIpMessage && (
+						<div className={`mt-4 p-3 rounded-lg text-sm ${
+							registerIpMessage.startsWith('Error')
+								? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+								: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+						}`}>
+							{registerIpMessage}
+						</div>
+					)}
+
+					{bunqStatus && !bunqStatus.success && bunqStatus.error && (
+						<div className="mt-4 p-3 rounded-lg text-sm bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400">
+							{bunqStatus.error}
+						</div>
+					)}
+
+					{bunqStatus?.success && (
+						<div className="mt-4 p-3 rounded-lg text-sm bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400">
+							Verbinding met bunq werkt; betaalverzoeken worden aangemaakt op rekening #{bunqStatus.connection?.pinnedAccount.id}
 						</div>
 					)}
 				</div>

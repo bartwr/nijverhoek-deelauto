@@ -1,26 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { connectToDatabase } from '@/lib/mongodb'
 import { DeelautoApiError, DeelautoConfigError } from '@/lib/deelauto-api'
 import { getReservationFeed } from '@/lib/reservation-feed'
+import { hasValidAdminSession } from '@/lib/session-auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
-async function hasValidAdminSession (): Promise<boolean> {
-	const cookieStore = await cookies()
-	const sessionToken = cookieStore.get('admin_session')
-
-	if (!sessionToken) return false
-
-	const { db } = await connectToDatabase()
-	const session = await db.collection('AdminSessions').findOne({
-		sessionToken: sessionToken.value,
-		expiresAt: { $gt: new Date() },
-	})
-
-	return session !== null
-}
 
 function buildFeedUrl (request: NextRequest): string | null {
 	const token = (process.env.ICAL_FEED_TOKEN ?? '').trim()

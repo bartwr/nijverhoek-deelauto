@@ -1,7 +1,19 @@
 import { NextResponse } from 'next/server'
 import { registerBunqServerIp } from '@/lib/bunq-api'
+import { hasValidAdminSession } from '@/lib/session-auth'
 
-export async function POST(): Promise<NextResponse> {
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+/**
+ * Registers the server's public IP address with bunq (device-server) so the
+ * OAuth access token may be used from this server. Admin only.
+ */
+export async function POST (): Promise<NextResponse> {
+	if (!await hasValidAdminSession()) {
+		return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 })
+	}
+
 	try {
 		console.log('IP registration request received')
 		
@@ -33,9 +45,4 @@ export async function POST(): Promise<NextResponse> {
 			message: 'Failed to register IP address with bunq API'
 		}, { status: 500 })
 	}
-}
-
-export async function GET(): Promise<NextResponse> {
-	// Allow GET requests to trigger IP registration as well for easier testing
-	return POST()
 }

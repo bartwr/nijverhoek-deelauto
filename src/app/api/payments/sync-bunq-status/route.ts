@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAllBunqStatuses, updatePaymentBunqStatus } from '@/lib/payment-utils'
+import { hasValidAdminOrUserSession } from '@/lib/session-auth'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+const UNAUTHORIZED_RESPONSE = { success: false, error: 'Authentication required' }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+	if (!await hasValidAdminOrUserSession()) {
+		return NextResponse.json(UNAUTHORIZED_RESPONSE, { status: 401 })
+	}
+
 	try {
 		const body = await request.json()
 		
@@ -55,6 +65,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function GET(): Promise<NextResponse> {
+	if (!await hasValidAdminOrUserSession()) {
+		return NextResponse.json(UNAUTHORIZED_RESPONSE, { status: 401 })
+	}
+
 	try {
 		// GET request to sync all payments
 		const result = await syncAllBunqStatuses()

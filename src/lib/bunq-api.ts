@@ -102,10 +102,36 @@ export interface BunqMeTabResponse {
 	}[]
 }
 
+/**
+ * Summary of a monetary account the OAuth token was granted access to.
+ */
+export interface BunqMonetaryAccountSummary {
+	id: number
+	type: 'MonetaryAccountBank' | 'MonetaryAccountSavings' | 'MonetaryAccountJoint' | string
+	description: string
+	iban: string | null
+	status: string
+}
+
 export interface BunqApiContext {
 	sessionToken: string
+	/**
+	 * The id to use in `/user/{id}/...` URLs. For an OAuth session this is the
+	 * `UserApiKey` id, not the id of the person who granted access.
+	 */
 	userId: number
 	monetaryAccountId: number
+	/** The account that payment requests are created on. */
+	account: BunqMonetaryAccountSummary
+	/** All accounts the OAuth grant gives access to. */
+	grantedAccounts: BunqMonetaryAccountSummary[]
+}
+
+interface BunqMonetaryAccountRaw {
+	id: number
+	description?: string
+	status?: string
+	alias?: Array<{ type: string; value: string; name?: string }>
 }
 
 interface BunqApiResponse {
@@ -115,9 +141,21 @@ interface BunqApiResponse {
 		RequestInquiry?: BunqPaymentResponse;
 		BunqMeTab?: BunqMeTabResponse;
 		UserPerson?: { id: number };
-		MonetaryAccountBank?: { id: number };
+		UserCompany?: { id: number };
+		UserApiKey?: { id: number };
+		MonetaryAccountBank?: BunqMonetaryAccountRaw;
+		MonetaryAccountSavings?: BunqMonetaryAccountRaw;
+		MonetaryAccountJoint?: BunqMonetaryAccountRaw;
 	}>;
 }
+
+const MONETARY_ACCOUNT_KEYS = [
+	'MonetaryAccountBank',
+	'MonetaryAccountSavings',
+	'MonetaryAccountJoint',
+] as const
+
+const USER_KEYS = ['UserApiKey', 'UserPerson', 'UserCompany'] as const
 
 /**
  * Get the server's external IP address using a public service
@@ -195,7 +233,12 @@ function getLocalIpAddress(): string {
 
 class BunqApiClient {
 	private baseUrl: string
-	private apiKey: string | null = null
+	/**
+	 * bunq OAuth access token. Obtained once via the admin OAuth flow and
+	 * scoped to the monetary account(s) selected during consent. Used as the
+	 * `secret` for device-server and session-server, exactly like an API key.
+	 */
+	private accessToken: string | null = null
 	private privateKey: string | null = null
 	private context: BunqApiContext | null = null
 	private initialized = false
@@ -216,22 +259,22 @@ class BunqApiClient {
 	private initializeEnvironment(): void {
 		if (this.initialized) return
 
-		this.apiKey = process.env.BUNQ_API_KEY || ''
+		this.accessToken = process.env.BUNQ_OAUTH_ACCESS_TOKEN || ''
 		this.privateKey = process.env.BUNQ_PRIVATE_KEY_FOR_SIGNING || ''
 		
 		console.log('BunqApiClient initialized with:', {
 			baseUrl: this.baseUrl,
-			hasApiKey: !!this.apiKey,
-			apiKeyLength: this.apiKey.length,
+			hasAccessToken: !!this.accessToken,
 			hasPrivateKey: !!this.privateKey,
-			privateKeyLength: this.privateKey.length,
-			privateKeyStartsWith: this.privateKey ? this.privateKey.substring(0, 30) + '...' : 'N/A',
 			hasInstallationToken: !!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN,
-			installationTokenLength: process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN?.length || 0
+			configuredAccountId: process.env.BUNQ_ACCOUNT_ID_FOR_REQUESTS || null
 		})
 		
-		if (!this.apiKey) {
-			throw new Error('BUNQ_API_KEY environment variable is required')
+		if (!this.accessToken) {
+			throw new Error(
+				'BUNQ_OAUTH_ACCESS_TOKEN environment variable is required. ' +
+				'Authorize the app via the admin dashboard (Bunq-koppeling).'
+			)
 		}
 		
 		if (!process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN) {
@@ -275,7 +318,6 @@ class BunqApiClient {
 			// Step 1: Start session using pre-configured installation token
 			console.log('Step 1: Starting session...')
 			const sessionResponse = await this.startSession()
-			console.log('Session response:', JSON.stringify(sessionResponse, null, 2))
 			
 			// Extract session token
 			const sessionToken = sessionResponse.Response?.[1]?.Token?.token
@@ -283,20 +325,28 @@ class BunqApiClient {
 				throw new Error('Session token not found in response')
 			}
 
-			// Step 2: Get user and monetary account info
-			console.log('Step 2: Getting user info...')
-			const userInfo = await this.getUserInfo(sessionToken)
-			console.log('User info:', userInfo)
-			const userId = userInfo.id
+			// Step 2: Extract the user id from the session response. For OAuth
+			// sessions bunq returns a UserApiKey object whose id must be used in
+			// URLs instead of the granting person's id.
+			const userId = this.extractUserId(sessionResponse)
+			console.log('Step 2: Session user id resolved:', userId)
 			
-			console.log('Step 3: Getting monetary account...')
-			const monetaryAccountId = await this.getMonetaryAccountId(sessionToken, userId)
-			console.log('Monetary account ID:', monetaryAccountId)
+			// Step 3: List the accounts the grant covers and pin the one to use
+			console.log('Step 3: Resolving monetary account...')
+			const grantedAccounts = await this.getGrantedMonetaryAccounts(sessionToken, userId)
+			const account = this.selectMonetaryAccount(grantedAccounts)
+			console.log('Monetary account pinned:', {
+				id: account.id,
+				description: account.description,
+				grantedCount: grantedAccounts.length
+			})
 
 			this.context = {
 				sessionToken,
 				userId,
-				monetaryAccountId
+				monetaryAccountId: account.id,
+				account,
+				grantedAccounts
 			}
 
 			console.log('Bunq context initialized successfully')
@@ -373,12 +423,12 @@ class BunqApiClient {
 			throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is not set')
 		}
 
-		if (!this.apiKey) {
-			throw new Error('API key not initialized')
+		if (!this.accessToken) {
+			throw new Error('OAuth access token not initialized')
 		}
 
 		const requestBody = {
-			secret: this.apiKey
+			secret: this.accessToken
 		}
 
 		const requestBodyString = JSON.stringify(requestBody)
@@ -387,7 +437,7 @@ class BunqApiClient {
 		console.log('Starting session with:', {
 			url: `${this.baseUrl}/v1/session-server`,
 			hasInstallationToken: !!installationToken,
-			hasApiKey: !!this.apiKey,
+			hasAccessToken: !!this.accessToken,
 			hasSignature: !!signature
 		})
 
@@ -423,46 +473,33 @@ class BunqApiClient {
 	}
 
 	/**
-	 * Get user information
+	 * Extract the user id to use in URLs from a session-server response.
+	 *
+	 * bunq returns `UserApiKey` for OAuth sessions and `UserPerson` /
+	 * `UserCompany` for plain API-key sessions.
 	 */
-	private async getUserInfo(sessionToken: string): Promise<{ id: number }> {
-		const response = await fetch(`${this.baseUrl}/v1/user`, {
-			method: 'GET',
-			headers: {
-				'X-Bunq-Client-Authentication': sessionToken,
-				'X-Bunq-Client-Request-Id': this.generateRequestId(),
-				'X-Bunq-Geolocation': '0 0 0 0 NL',
-				'X-Bunq-Language': 'nl_NL',
-				'X-Bunq-Region': 'nl_NL'
+	private extractUserId(sessionResponse: BunqApiResponse): number {
+		for (const item of sessionResponse.Response ?? []) {
+			for (const key of USER_KEYS) {
+				const user = item[key]
+				if (user && typeof user.id === 'number') {
+					return user.id
+				}
 			}
-		})
-
-		if (!response.ok) {
-			throw new Error(`Get user info failed: ${response.statusText}`)
 		}
 
-		const data = await response.json() as BunqApiResponse
-		return data.Response[0].UserPerson!
+		throw new Error('User id not found in session response')
 	}
 
 	/**
-	 * Get monetary account ID - use configured account for payment requests
+	 * List the monetary accounts the current credentials may access. Under
+	 * OAuth this is exactly the set selected by the account holder during
+	 * consent.
 	 */
-	private async getMonetaryAccountId(sessionToken: string, userId: number): Promise<number> {
-		// Check if specific account ID is configured via environment variable
-		const configuredAccountId = process.env.BUNQ_ACCOUNT_ID_FOR_REQUESTS
-		if (configuredAccountId) {
-			const accountId = parseInt(configuredAccountId, 10)
-			if (!isNaN(accountId)) {
-				console.log(`Using configured monetary account ID: ${accountId}`)
-				return accountId
-			} else {
-				console.warn(`Invalid BUNQ_ACCOUNT_ID_FOR_REQUESTS value: ${configuredAccountId}. Must be a number.`)
-			}
-		}
-
-		// Fallback: fetch the available monetary accounts
-		console.log('No specific account ID configured, fetching available accounts...')
+	private async getGrantedMonetaryAccounts(
+		sessionToken: string,
+		userId: number
+	): Promise<BunqMonetaryAccountSummary[]> {
 		const response = await fetch(`${this.baseUrl}/v1/user/${userId}/monetary-account`, {
 			method: 'GET',
 			headers: {
@@ -475,14 +512,89 @@ class BunqApiClient {
 		})
 
 		if (!response.ok) {
-			throw new Error(`Get monetary account failed: ${response.statusText}`)
+			const errorText = await response.text()
+			throw new Error(`Get monetary accounts failed: ${response.statusText} - ${errorText}`)
 		}
 
 		const data = await response.json() as BunqApiResponse
-		console.log('Available monetary accounts:', JSON.stringify(data, null, 2))
-		
-		// Return the first monetary account ID as fallback
-		return data.Response[0].MonetaryAccountBank!.id
+		const accounts: BunqMonetaryAccountSummary[] = []
+
+		for (const item of data.Response ?? []) {
+			for (const key of MONETARY_ACCOUNT_KEYS) {
+				const raw = item[key]
+				if (!raw) continue
+
+				const ibanAlias = raw.alias?.find(alias => alias.type === 'IBAN')
+				accounts.push({
+					id: raw.id,
+					type: key,
+					description: raw.description ?? '',
+					iban: ibanAlias?.value ?? null,
+					status: raw.status ?? 'UNKNOWN'
+				})
+			}
+		}
+
+		console.log('Granted monetary accounts:', accounts.map(account => ({
+			id: account.id,
+			type: account.type,
+			description: account.description
+		})))
+
+		return accounts
+	}
+
+	/**
+	 * Pick the monetary account to create payment requests on.
+	 *
+	 * - If `BUNQ_ACCOUNT_ID_FOR_REQUESTS` is set it must be one of the granted
+	 *   accounts; anything else is a configuration error.
+	 * - If it is not set and exactly one account was granted, that account is
+	 *   used.
+	 * - Never silently falls back to "the first account".
+	 */
+	private selectMonetaryAccount(
+		grantedAccounts: BunqMonetaryAccountSummary[]
+	): BunqMonetaryAccountSummary {
+		if (grantedAccounts.length === 0) {
+			throw new Error(
+				'The bunq OAuth grant does not cover any monetary account. ' +
+				'Re-authorize the app and select the deelauto account.'
+			)
+		}
+
+		const configuredValue = (process.env.BUNQ_ACCOUNT_ID_FOR_REQUESTS ?? '').trim()
+
+		if (configuredValue !== '') {
+			const configuredId = Number.parseInt(configuredValue, 10)
+			if (Number.isNaN(configuredId)) {
+				throw new Error(
+					`Invalid BUNQ_ACCOUNT_ID_FOR_REQUESTS value: ${configuredValue}. Must be a number.`
+				)
+			}
+
+			const match = grantedAccounts.find(account => account.id === configuredId)
+			if (!match) {
+				const grantedIds = grantedAccounts.map(account => account.id).join(', ')
+				throw new Error(
+					`BUNQ_ACCOUNT_ID_FOR_REQUESTS (${configuredId}) is not among the ` +
+					`accounts granted to the OAuth token (${grantedIds}).`
+				)
+			}
+
+			return match
+		}
+
+		if (grantedAccounts.length === 1) {
+			return grantedAccounts[0]
+		}
+
+		const grantedIds = grantedAccounts.map(account => account.id).join(', ')
+		throw new Error(
+			`The OAuth grant covers ${grantedAccounts.length} accounts (${grantedIds}). ` +
+			'Set BUNQ_ACCOUNT_ID_FOR_REQUESTS to the deelauto account id, or ' +
+			're-authorize with only that account selected.'
+		)
 	}
 
 	/**
@@ -813,14 +925,15 @@ class BunqApiClient {
 				throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is required')
 			}
 
-			if (!this.apiKey) {
-				throw new Error('BUNQ_API_KEY environment variable is required')
+			if (!this.accessToken) {
+				throw new Error('BUNQ_OAUTH_ACCESS_TOKEN environment variable is required')
 			}
 
-			// Prepare the device-server registration request
+			// Prepare the device-server registration request. The OAuth access
+			// token is the secret bound to this installation and IP address.
 			const requestBody = {
-				description: "Nijverhoek Deelauto",
-				secret: this.apiKey,
+				description: 'Nijverhoek Deelauto',
+				secret: this.accessToken,
 				permitted_ips: [ipAddress]
 			}
 
@@ -844,9 +957,6 @@ class BunqApiClient {
 					statusText: response.statusText,
 					errorBody: errorText
 				})
-				
-				// Log the curl command for debugging
-				console.log(`curl -L --request POST --url '${this.baseUrl}/v1/device-server' --header 'User-Agent: nijverhoek-deelauto/1.0' --header 'X-Bunq-Client-Authentication: ${installationToken}' --header 'Content-Type: application/json' --data '${requestBodyString}'`)
 				
 				throw new Error(`Device-server registration failed: ${response.status} ${response.statusText} - ${errorText}`)
 			}
