@@ -133,19 +133,19 @@ function describeIpMode (mode: BunqDeviceIpMode, detectedIp: string): string {
 }
 
 /**
- * Outcome of registering this server with bunq (POST /device-server).
+ * Outcome of setting up the API context (installation + device-server).
  */
-export interface BunqIpRegistrationResult {
+export interface BunqApiContextSetupResult {
 	success: boolean
 	ipAddress: string
 	message: string
 	/** Strategy that succeeded; absent on failure. */
 	ipMode?: BunqDeviceIpMode
 	/**
-	 * Present when a fresh installation had to be created. Must be stored as
+	 * Token of the freshly created installation. Must be stored as
 	 * `BUNQ_INSTALLATION_RESPONSE_TOKEN`; it is never logged or persisted.
 	 */
-	newInstallationToken?: string
+	installationToken?: string
 }
 
 export interface BunqApiContext {
@@ -332,23 +332,6 @@ class BunqApiClient {
 			this.initializeEnvironment()
 			
 			console.log('Starting bunq context initialization...')
-			
-			// Optional: Register IP address if in production environment
-			// This is a fallback in case the deployment script doesn't run
-			if (process.env.NODE_ENV === 'production' && process.env.BUNQ_AUTO_REGISTER_IP === 'true') {
-				console.log('Auto-registering IP address for production environment...')
-				try {
-					const ipResult = await this.registerServerIpAddress()
-					if (ipResult.success) {
-						console.log('✅ IP auto-registration successful during context initialization')
-					} else {
-						console.warn('⚠️ IP auto-registration failed during context initialization:', ipResult.message)
-					}
-				} catch (error) {
-					console.warn('⚠️ IP auto-registration error during context initialization:', error)
-					// Don't fail context initialization if IP registration fails
-				}
-			}
 			
 			// Step 1: Start session using pre-configured installation token
 			console.log('Step 1: Starting session...')
@@ -1004,23 +987,30 @@ class BunqApiClient {
 	}
 
 	/**
-	 * POST /device-server: bind the OAuth access token to the given
-	 * installation. `permittedIps` is sent as-is; when omitted bunq binds the
-	 * device to the IP address it sees on this request.
+	 * POST /device-server: bind a secret to the given installation.
+	 *
+	 * The secret must be a bunq **API key**; an OAuth access token is rejected
+	 * here ("Incorrect API key or IP address"). The OAuth token is only used
+	 * later, as the `secret` of POST /session-server on this same
+	 * installation.
+	 *
+	 * `permittedIps` is sent as-is; when omitted bunq binds the device to the
+	 * IP address it sees on this request.
 	 */
-	private async createDeviceServer(installationToken: string, permittedIps?: string[]): Promise<void> {
-		if (!this.accessToken) {
-			throw new Error('BUNQ_OAUTH_ACCESS_TOKEN environment variable is required')
-		}
-
-		// The OAuth access token is the secret bound to this installation.
+	private async createDeviceServer(
+		installationToken: string,
+		apiKey: string,
+		permittedIps?: string[]
+	): Promise<void> {
 		const requestBody: { description: string; secret: string; permitted_ips?: string[] } = {
 			description: 'Nijverhoek Deelauto',
-			secret: this.accessToken
+			secret: apiKey
 		}
 		if (permittedIps) {
 			requestBody.permitted_ips = permittedIps
 		}
+
+		const requestBodyString = JSON.stringify(requestBody)
 
 		console.log('Registering device-server with bunq API...', {
 			permittedIps: permittedIps ?? '(calling IP, chosen by bunq)'
@@ -1029,11 +1019,16 @@ class BunqApiClient {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
+				'Cache-Control': 'no-cache',
 				'User-Agent': 'nijverhoek-deelauto/1.0',
 				'X-Bunq-Client-Request-Id': this.generateRequestId(),
-				'X-Bunq-Client-Authentication': installationToken
+				'X-Bunq-Geolocation': '0 0 0 0 NL',
+				'X-Bunq-Language': 'nl_NL',
+				'X-Bunq-Region': 'nl_NL',
+				'X-Bunq-Client-Authentication': installationToken,
+				'X-Bunq-Client-Signature': this.createSignature(requestBodyString)
 			},
-			body: JSON.stringify(requestBody)
+			body: requestBodyString
 		})
 
 		if (!response.ok) {
@@ -1073,6 +1068,7 @@ class BunqApiClient {
 	 */
 	private async createDeviceServerWithIpFallbacks(
 		installationToken: string,
+		apiKey: string,
 		detectedIp: string
 	): Promise<BunqDeviceIpMode> {
 		const allowWildcard = (process.env.BUNQ_ALLOW_ALL_IPS ?? 'true').trim().toLowerCase() !== 'false'
@@ -1090,7 +1086,7 @@ class BunqApiClient {
 		const failures: string[] = []
 		for (const attempt of attempts) {
 			try {
-				await this.createDeviceServer(installationToken, attempt.permittedIps)
+				await this.createDeviceServer(installationToken, apiKey, attempt.permittedIps)
 				return attempt.mode
 			} catch (error) {
 				if (error instanceof Error && error.name === 'BunqDeviceAlreadyExistsError') {
@@ -1104,77 +1100,66 @@ class BunqApiClient {
 
 		throw new Error(
 			'All device-server attempts failed. If every attempt reports "Incorrect API key or IP address" ' +
-			'the access token itself is most likely wrong (re-run the OAuth flow) or issued for the other ' +
-			`environment (sandbox vs production). Details: ${failures.join(' | ')}`
+			'the API key is wrong, revoked, or issued for the other environment (sandbox vs production). ' +
+			`Details: ${failures.join(' | ')}`
 		)
 	}
 
 	/**
-	 * Register the server's IP address with bunq API for device-server.
+	 * Set up a fresh API context: create an installation for the configured
+	 * RSA key pair and register a device on it.
 	 *
-	 * When `allowNewInstallation` is true and the current installation already
-	 * has a device (bound to a previous secret), a new installation is created
-	 * and the device is registered on that one. The caller must then store the
-	 * returned `newInstallationToken` as `BUNQ_INSTALLATION_RESPONSE_TOKEN`.
+	 * The API key is only needed here. It is passed in by an admin, used for
+	 * this one request and then discarded; it is never stored or logged. At
+	 * runtime the app authenticates with the OAuth access token on the
+	 * installation created here.
+	 *
+	 * An installation carries exactly one device, so this always creates a new
+	 * installation. The returned token must be stored as
+	 * `BUNQ_INSTALLATION_RESPONSE_TOKEN`.
 	 */
-	async registerServerIpAddress(
-		options: { allowNewInstallation?: boolean } = {}
-	): Promise<BunqIpRegistrationResult> {
+	async setupApiContext(apiKey: string): Promise<BunqApiContextSetupResult> {
+		const trimmedApiKey = apiKey.trim()
+
 		try {
-			// Initialize environment variables
-			this.initializeEnvironment()
+			if (trimmedApiKey === '') {
+				throw new Error('An API key from the bunq app is required to register the device')
+			}
+
+			if (!this.privateKey) {
+				this.privateKey = (process.env.BUNQ_PRIVATE_KEY_FOR_SIGNING || '').trim()
+			}
+			if (!this.privateKey) {
+				throw new Error('BUNQ_PRIVATE_KEY_FOR_SIGNING environment variable is required')
+			}
 
 			// Get the server's external IP address
 			const ipAddress = await getExternalIpAddress()
-			console.log(`Registering IP address with bunq: ${ipAddress}`)
+			console.log(`Setting up bunq API context, detected IP: ${ipAddress}`)
 
-			const installationToken = (process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN || '').trim()
-			if (!installationToken) {
-				throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is required')
-			}
+			const installationToken = await this.createInstallation()
+			const ipMode = await this.createDeviceServerWithIpFallbacks(installationToken, trimmedApiKey, ipAddress)
 
-			let ipMode: BunqDeviceIpMode
-			try {
-				ipMode = await this.createDeviceServerWithIpFallbacks(installationToken, ipAddress)
-			} catch (error) {
-				const isDeviceConflict = error instanceof Error && error.name === 'BunqDeviceAlreadyExistsError'
-				if (!isDeviceConflict || !options.allowNewInstallation) {
-					throw error
-				}
-
-				console.warn('Installation already has a device; creating a new installation for the OAuth token')
-				const newInstallationToken = await this.createInstallation()
-				const newIpMode = await this.createDeviceServerWithIpFallbacks(newInstallationToken, ipAddress)
-
-				// Forget any session built on the old installation.
-				this.context = null
-
-				return {
-					success: true,
-					ipAddress,
-					ipMode: newIpMode,
-					newInstallationToken,
-					message:
-						`Registered device (${describeIpMode(newIpMode, ipAddress)}) on a new bunq installation. ` +
-						'Store the new installation token as BUNQ_INSTALLATION_RESPONSE_TOKEN and redeploy.'
-				}
-			}
+			// Forget any session built on the previous installation.
+			this.context = null
 
 			return {
 				success: true,
 				ipAddress,
 				ipMode,
-				message: `Registered device with bunq (${describeIpMode(ipMode, ipAddress)})`
+				installationToken,
+				message:
+					`Device registered (${describeIpMode(ipMode, ipAddress)}). ` +
+					'Store the installation token as BUNQ_INSTALLATION_RESPONSE_TOKEN and redeploy.'
 			}
-
 		} catch (error) {
-			console.error('Error registering server IP address:', error)
+			console.error('Error setting up bunq API context:', error)
 			const ipAddress = await getExternalIpAddress().catch(() => 'Unknown')
 			
 			return {
 				success: false,
 				ipAddress,
-				message: `Failed to register IP address: ${error instanceof Error ? error.message : 'Unknown error'}`
+				message: `Failed to set up the bunq API context: ${error instanceof Error ? error.message : 'Unknown error'}`
 			}
 		}
 	}
@@ -1311,13 +1296,11 @@ export async function checkBunqPaymentStatus(requestId: number, isBunqUserReques
 }
 
 /**
- * Helper function to register server IP address with bunq API.
+ * Helper function to set up the bunq API context (installation + device).
  *
- * Pass `allowNewInstallation: true` (admin-triggered only) to let the client
- * create a fresh installation when the current one already has a device.
+ * `apiKey` is an API key from the bunq app; it is used for this call only and
+ * never stored.
  */
-export async function registerBunqServerIp(
-	options: { allowNewInstallation?: boolean } = {}
-): Promise<BunqIpRegistrationResult> {
-	return await bunqApi.registerServerIpAddress(options)
+export async function setupBunqApiContext(apiKey: string): Promise<BunqApiContextSetupResult> {
+	return await bunqApi.setupApiContext(apiKey)
 }

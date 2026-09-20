@@ -137,9 +137,8 @@ Kopieer het nu.</div>
 	<li>Zet <code>BUNQ_ACCOUNT_ID_FOR_REQUESTS</code> op het id van de deelauto-rekening
 	(zichtbaar in het admin dashboard na de volgende deploy).</li>
 	<li>Verwijder de oude <code>BUNQ_API_KEY</code> en deploy opnieuw.</li>
-	<li>Klik in het admin dashboard op <strong>Registreer server-IP</strong>, zodat bunq
-	dit token aan de server koppelt.</li>
-	<li>Trek de oude API-sleutel in via de bunq-app.</li>
+	<li>Registreer dit apparaat eenmalig bij bunq via het admin dashboard
+	(&quot;Apparaat registreren bij bunq&quot;), als je dat nog niet gedaan hebt.</li>
 </ol>
 <p><a href="/admin">Terug naar het admin dashboard</a></p>`
 

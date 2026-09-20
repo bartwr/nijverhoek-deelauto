@@ -83,6 +83,7 @@ export default function AdminPage() {
 	const [isCheckingBunq, setIsCheckingBunq] = useState(false)
 	const [isRegisteringIp, setIsRegisteringIp] = useState(false)
 	const [registerIpMessage, setRegisterIpMessage] = useState('')
+	const [bunqApiKey, setBunqApiKey] = useState('')
 	const [newInstallationToken, setNewInstallationToken] = useState<string | null>(null)
 	const router = useRouter()
 
@@ -153,13 +154,22 @@ export default function AdminPage() {
 		}
 	}, [isLoggedIn, loadFeedStatus, loadBunqStatus])
 
-	const handleRegisterServerIp = async () => {
+	const handleSetupBunqDevice = async (e: React.FormEvent) => {
+		e.preventDefault()
+		if (!bunqApiKey.trim()) return
+
 		setIsRegisteringIp(true)
 		setRegisterIpMessage('')
 		setNewInstallationToken(null)
 
 		try {
-			const response = await fetch('/api/bunq/register-ip', { method: 'POST' })
+			const response = await fetch('/api/admin/bunq/setup', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ apiKey: bunqApiKey })
+			})
 			const data = await response.json()
 
 			if (response.ok && data.success) {
@@ -169,22 +179,18 @@ export default function AdminPage() {
 						? 'gekoppeld aan het IP-adres dat bunq zag'
 						: `gekoppeld aan IP ${data.ipAddress}`
 
-				if (data.newInstallationToken) {
-					setNewInstallationToken(data.newInstallationToken)
-					setRegisterIpMessage(
-						`Apparaat geregistreerd (${ipModeLabel}) op een nieuwe bunq-installatie. ` +
-						'Zet het token hieronder als BUNQ_INSTALLATION_RESPONSE_TOKEN en deploy opnieuw.'
-					)
-				} else {
-					setRegisterIpMessage(`Apparaat geregistreerd bij bunq (${ipModeLabel})`)
-					await loadBunqStatus()
-				}
+				setBunqApiKey('')
+				setNewInstallationToken(data.installationToken)
+				setRegisterIpMessage(
+					`Apparaat geregistreerd (${ipModeLabel}). ` +
+					'Zet het token hieronder als BUNQ_INSTALLATION_RESPONSE_TOKEN en deploy opnieuw.'
+				)
 			} else {
-				setRegisterIpMessage(`Error: ${data.message || data.error || 'IP-registratie mislukt'}`)
+				setRegisterIpMessage(`Error: ${data.message || data.error || 'Registratie mislukt'}`)
 			}
 		} catch (error) {
-			console.error('Error registering server IP:', error)
-			setRegisterIpMessage('Error: IP-registratie mislukt')
+			console.error('Error setting up bunq device:', error)
+			setRegisterIpMessage('Error: Registratie mislukt')
 		} finally {
 			setIsRegisteringIp(false)
 		}
@@ -413,9 +419,9 @@ export default function AdminPage() {
 						</h3>
 					</div>
 					<p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
-						De app gebruikt een bunq OAuth-token dat alleen toegang heeft tot de geselecteerde
-						rekening en geen geld naar derden kan overmaken. Koppel het account eenmalig via
-						de bunq-app; het token zet je daarna als omgevingsvariabele.
+						De app draait op een bunq OAuth-token dat alleen toegang heeft tot de geselecteerde
+						rekening en geen geld naar derden kan overmaken. Eenmalige setup: registreer het
+						apparaat met een API-sleutel (wordt niet bewaard) en koppel daarna het bunq-account.
 					</p>
 
 					{bunqStatus && (
@@ -467,21 +473,6 @@ export default function AdminPage() {
 						</a>
 						<button
 							type="button"
-							onClick={handleRegisterServerIp}
-							disabled={isRegisteringIp || !bunqStatus?.config.hasAccessToken}
-							className="inline-flex items-center justify-center space-x-2 px-6 py-3 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors cursor-pointer"
-						>
-							{isRegisteringIp ? (
-								<>
-									<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-									<span>Registreren...</span>
-								</>
-							) : (
-								<span>Registreer server-IP</span>
-							)}
-						</button>
-						<button
-							type="button"
 							onClick={loadBunqStatus}
 							disabled={isCheckingBunq}
 							className="inline-flex items-center justify-center space-x-2 px-6 py-3 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors cursor-pointer"
@@ -496,6 +487,43 @@ export default function AdminPage() {
 							)}
 						</button>
 					</div>
+
+					<form onSubmit={handleSetupBunqDevice} className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+						<label htmlFor="bunqApiKey" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+							Apparaat registreren bij bunq
+						</label>
+						<p className="text-sm text-gray-600 dark:text-gray-300 mb-3 leading-relaxed">
+							bunq accepteert alleen een API-sleutel om dit apparaat te registreren. De sleutel
+							wordt alleen voor deze ene aanroep gebruikt en nergens opgeslagen; daarna werkt de
+							app met het OAuth-token. Zet in de bunq-app &quot;Allow all IP addresses&quot; aan,
+							anders moet je dit bij elke IP-wijziging herhalen.
+						</p>
+						<div className="flex flex-col sm:flex-row gap-2">
+							<input
+								id="bunqApiKey"
+								type="password"
+								autoComplete="off"
+								value={bunqApiKey}
+								onChange={(event) => setBunqApiKey(event.target.value)}
+								placeholder="API-sleutel uit de bunq-app"
+								className="flex-1 rounded-lg px-4 py-3 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 font-mono text-xs"
+							/>
+							<button
+								type="submit"
+								disabled={isRegisteringIp || !bunqApiKey.trim()}
+								className="inline-flex items-center justify-center space-x-2 px-6 py-3 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+							>
+								{isRegisteringIp ? (
+									<>
+										<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+										<span>Registreren...</span>
+									</>
+								) : (
+									<span>Registreer apparaat</span>
+								)}
+							</button>
+						</div>
+					</form>
 
 					{registerIpMessage && (
 						<div className={`mt-4 p-3 rounded-lg text-sm ${
