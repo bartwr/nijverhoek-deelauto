@@ -22,9 +22,23 @@ access token may see. The token:
   app;
 - can still create monetary accounts and manage cards, so keep it secret.
 
-The app uses this access token exactly where it previously used the API key. It
-additionally refuses to run unless the configured account is one of the
-accounts covered by the grant, and never falls back to "the first account".
+At runtime the app authenticates with this access token only. It additionally
+refuses to run unless the configured account is one of the accounts covered by
+the grant, and never falls back to "the first account".
+
+### The one place an API key is still needed
+
+bunq's authentication has two layers. The *installation + device* layer
+identifies your server, and bunq only accepts an **API key** as the
+device-server secret; an OAuth token is rejected there with "Incorrect API key
+or IP address". The access token is used one layer up, as the `secret` of
+`POST /session-server` on that same installation. bunq's own reference
+implementation works exactly this way.
+
+So an API key is needed **once**, to register the device. The app asks for it
+in an admin-only form, uses it for that single request and discards it: it is
+never written to the environment, the database or the logs. Nothing at runtime
+needs it, so the deployment holds no full-access credential.
 
 ## Required Environment Variables
 
@@ -52,16 +66,13 @@ BUNQ_API_BASE_URL=https://api.bunq.com
 # Base URL of this app; used to build the OAuth redirect URL
 NEXT_PUBLIC_BASE_URL=https://auto.nijverhoek.nl
 
-# Optional: re-register the server IP on first use in production
-BUNQ_AUTO_REGISTER_IP=true
-
 # Optional: set to "false" to forbid the IP wildcard when registering the
 # device. Only do this on a host with a fixed egress IP. See IP_REGISTRATION.md
 BUNQ_ALLOW_ALL_IPS=true
 ```
 
-`BUNQ_API_KEY` is no longer read. Remove it from your environment and revoke
-the key in the bunq app.
+`BUNQ_API_KEY` is no longer read; the API key is entered in the admin form
+during setup instead. Remove the variable from your environment.
 
 ## One-time setup
 
@@ -75,39 +86,38 @@ the key in the bunq app.
 4. Copy the client id and secret into `BUNQ_OAUTH_CLIENT_ID` and
    `BUNQ_OAUTH_CLIENT_SECRET` and deploy.
 
-### 2. Authorize the app
+### 2. Register the device
 
-1. Log in to `/admin` and click **Koppel bunq-account** in the
-   "Bunq-koppeling" card. You are redirected to bunq.
+In the bunq app, open the API key you want to use for this step and turn on
+**Allow all IP addresses**. Without it the registration is pinned to one IP
+address and has to be repeated whenever the hosting platform changes its
+egress IP.
+
+Then log in to `/admin`, and in the "Bunq-koppeling" card paste that API key
+into **Apparaat registreren bij bunq** and submit. The app:
+
+1. creates an installation for the RSA key pair in
+   `BUNQ_PRIVATE_KEY_FOR_SIGNING` (`POST /installation`),
+2. registers a device on it with the API key as the secret
+   (`POST /device-server`), preferring `permitted_ips: ["<ip>", "*"]`,
+3. shows the new installation token **once** and forgets the API key.
+
+Store that token as `BUNQ_INSTALLATION_RESPONSE_TOKEN` and redeploy. An
+installation carries exactly one device, so each run of this step creates a new
+installation; older ones simply go unused.
+
+See [IP_REGISTRATION.md](IP_REGISTRATION.md) for the IP strategies.
+
+### 3. Authorize the app
+
+1. Click **Koppel bunq-account** in the "Bunq-koppeling" card. You are
+   redirected to bunq.
 2. Scan the QR code with the bunq app and select **only** the deelauto
    account.
 3. bunq redirects back to the app, which exchanges the code for an access
    token and shows it **once**. It is not stored or logged anywhere.
 4. Put the token in `BUNQ_OAUTH_ACCESS_TOKEN`, set
    `BUNQ_ACCOUNT_ID_FOR_REQUESTS`, remove `BUNQ_API_KEY`, and redeploy.
-
-### 3. Bind the token to the server
-
-bunq binds a secret to an installation and IP address via `POST
-/device-server`, and **an installation can carry exactly one device**. Your
-existing installation is bound to the old API key, so bunq refuses a second
-device on it ("A device already exists for the current installation").
-
-Click **Registreer server-IP** in the "Bunq-koppeling" card. When bunq reports
-that conflict, the app automatically:
-
-1. creates a new installation for the same RSA key pair (`POST /installation`),
-2. registers the device with the OAuth token on that installation,
-3. shows the new installation token **once**.
-
-Store that token as `BUNQ_INSTALLATION_RESPONSE_TOKEN` and redeploy. Until
-then "Test verbinding" still uses the old installation and fails.
-
-`BUNQ_AUTO_REGISTER_IP=true` only re-registers the IP on the *current*
-installation; it never creates a new one, because the app cannot update its
-own environment variables.
-
-See [IP_REGISTRATION.md](IP_REGISTRATION.md) for details.
 
 ### 4. Verify
 
@@ -117,13 +127,15 @@ are pinned to. If `BUNQ_ACCOUNT_ID_FOR_REQUESTS` is not among the granted
 accounts, the app refuses to create payment requests and reports the granted
 ids instead.
 
-Finally, revoke the old API key in the bunq app.
-
 ## Re-authorizing
 
 Access tokens do not expire but can be revoked from the bunq app. To
-re-authorize, repeat step 2 and 3 with the new token. To change which account
-is shared, revoke the grant in the bunq app and re-authorize.
+re-authorize, repeat step 3 with the new token. To change which account is
+shared, revoke the grant in the bunq app and re-authorize.
+
+Keep the API key used in step 2 alive: the device on the installation is bound
+to it. Revoking it invalidates the installation, and you would have to run
+step 2 again with another key.
 
 ## How It Works
 
@@ -150,7 +162,7 @@ All bunq endpoints require a session:
 | `GET /api/admin/bunq/oauth/start` | admin | Redirects to the bunq authorization page |
 | `GET /api/admin/bunq/oauth/callback` | admin | Exchanges the code, shows the token once |
 | `GET /api/admin/bunq/status` | admin | Config check and connection test (no secret values) |
-| `POST /api/bunq/register-ip` | admin | Registers the server IP with bunq |
+| `POST /api/admin/bunq/setup` | admin | Creates an installation and registers the device, using an API key from the request body |
 | `GET|POST /api/payments/sync-bunq-status` | admin or member | Syncs payment statuses |
 
 The former unauthenticated debug endpoints `/api/test-bunq`,
@@ -164,18 +176,17 @@ The former unauthenticated debug endpoints `/api/test-bunq`,
   create the OAuth client in the bunq app and set both variables.
 - **"De state komt niet overeen"**: the CSRF cookie expired (10 minutes) or
   the flow was started in another browser. Start again from `/admin`.
-- **"Session start failed: 401"**: the token is not bound to this server IP
-  yet, or was revoked. Click "Registreer server-IP" or re-authorize.
-- **"A device already exists for the current installation"**: the installation
-  is bound to a previous secret. "Registreer server-IP" creates a new
-  installation and shows its token; store it as
-  `BUNQ_INSTALLATION_RESPONSE_TOKEN` and redeploy.
+- **"Session start failed: ... Incorrect API key or IP address"**: the
+  installation in `BUNQ_INSTALLATION_RESPONSE_TOKEN` has no device, its device
+  does not cover this server's IP, or the access token was revoked. Run step 2
+  again, then step 3 if needed.
+- **"A device already exists for the current installation"**: an installation
+  carries one device. Step 2 always creates a fresh installation, so this
+  should no longer occur.
 - **"User credentials are incorrect. Incorrect API key or IP address"** on
-  device registration: either the calling IP was not in `permitted_ips` (the
-  app now retries with a wildcard and with bunq's own view of the IP, see
-  [IP_REGISTRATION.md](IP_REGISTRATION.md)), or the access token is wrong or
-  belongs to the other environment. If all retries fail, re-run the OAuth
-  flow.
+  device registration: the value in the API key field is wrong, revoked, or
+  belongs to the other environment (sandbox vs production). An OAuth access
+  token is *not* accepted here; it must be an API key from the bunq app.
 - **"BUNQ_ACCOUNT_ID_FOR_REQUESTS (...) is not among the accounts granted"**:
   either change the variable to one of the listed ids, or re-authorize with
   the right account selected.
@@ -188,6 +199,9 @@ The former unauthenticated debug endpoints `/api/test-bunq`,
 
 - The access token, client secret, installation token and private key are
   read from environment variables only and never returned by any endpoint.
+- The API key is only ever held in memory during the admin setup request. It
+  is not stored in the environment, the database or the logs, so a compromise
+  of the deployment does not expose a full-access credential.
 - The `/device-server` failure log no longer prints the installation token.
 - Anyone with the access token can create payment requests on the shared
   account and read its payments; treat it like a password.
