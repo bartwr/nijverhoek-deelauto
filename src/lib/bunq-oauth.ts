@@ -7,6 +7,8 @@
  * used by `bunq-api.ts` in place of a full-access API key.
  */
 
+import { getBunqProxyHost, getBunqProxyStaticIps } from './bunq-api'
+
 export const BUNQ_OAUTH_STATE_COOKIE = 'bunq_oauth_state'
 export const BUNQ_OAUTH_CALLBACK_PATH = '/api/admin/bunq/oauth/callback'
 
@@ -64,11 +66,17 @@ export function getBunqOAuthConfigStatus (): {
 	hasPrivateKey: boolean
 	configuredAccountId: string | null
 	isSandbox: boolean
+	/** Host of the static-IP proxy bunq traffic is routed through, if any. */
+	proxyHost: string | null
+	/** Static IPs of that proxy that should be whitelisted at bunq. */
+	proxyStaticIps: string[]
 } {
 	const accessToken = process.env.BUNQ_OAUTH_ACCESS_TOKEN
 	const installationToken = process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN
 
 	return {
+		proxyHost: getBunqProxyHost(),
+		proxyStaticIps: getBunqProxyStaticIps(),
 		hasClientId: (process.env.BUNQ_OAUTH_CLIENT_ID ?? '').trim() !== '',
 		hasClientSecret: (process.env.BUNQ_OAUTH_CLIENT_SECRET ?? '').trim() !== '',
 		hasAccessToken: tokenSuffix(accessToken) !== null,

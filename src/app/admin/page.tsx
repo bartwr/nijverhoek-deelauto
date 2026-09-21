@@ -47,6 +47,8 @@ interface BunqStatus {
 		hasPrivateKey: boolean
 		configuredAccountId: string | null
 		isSandbox: boolean
+		proxyHost: string | null
+		proxyStaticIps: string[]
 	}
 	redirectUri: string
 	egressIp?: string
@@ -59,8 +61,56 @@ interface BunqStatus {
 		pinnedAccount: BunqAccountSummary
 		grantedAccounts: BunqAccountSummary[]
 	}
+	credentialWhitelists?: {
+		credentials: Array<{
+			credentialId: number
+			status: string
+			ips: Array<{ ip: string; status: string }>
+		}>
+		error?: string
+	}
+	whitelistUpdate?: {
+		added: Array<{ credentialId: number; ip: string }>
+		failed: Array<{ credentialId: number; ip: string; error: string }>
+		error?: string
+	}
 	error?: string
 	hint?: string
+}
+
+function describeBunqProxy (config: BunqStatus['config']): string {
+	if (!config.proxyHost) return 'Geen proxy; bunq ziet wisselende Vercel-IP\u2019s'
+	const ips = config.proxyStaticIps.length > 0
+		? `vaste IP\u2019s ${config.proxyStaticIps.join(', ')}`
+		: 'BUNQ_PROXY_STATIC_IPS niet ingesteld'
+	return `${config.proxyHost} (${ips})`
+}
+
+function describeBunqWhitelistUpdate (update: BunqStatus['whitelistUpdate']): string | null {
+	if (!update) return null
+	if (update.error) return `Whitelisten van proxy-IP\u2019s mislukt: ${update.error}`
+	const parts: string[] = []
+	if (update.added.length > 0) {
+		parts.push(`Toegevoegd aan whitelist: ${update.added.map(entry => entry.ip).join(', ')}`)
+	}
+	if (update.failed.length > 0) {
+		parts.push(`Niet toegevoegd: ${update.failed.map(entry => `${entry.ip} (${entry.error})`).join('; ')}`)
+	}
+	return parts.length > 0 ? parts.join('. ') : null
+}
+
+function describeBunqWhitelists (whitelists: BunqStatus['credentialWhitelists']): string {
+	if (!whitelists) return 'Alleen zichtbaar na een geslaagde verbinding'
+	if (whitelists.error) return `Niet opvraagbaar: ${whitelists.error}`
+	if (whitelists.credentials.length === 0) return 'Geen credentials zichtbaar voor deze sessie'
+	return whitelists.credentials
+		.map(credential => {
+			const ips = credential.ips.length > 0
+				? credential.ips.map(entry => `${entry.ip} (${entry.status})`).join(', ')
+				: 'geen IP-regels'
+			return `#${credential.credentialId}: ${ips}`
+		})
+		.join('; ')
 }
 
 function describeBunqDevices (installation: BunqStatus['installation']): string {
@@ -487,6 +537,18 @@ export default function AdminPage() {
 								</dd>
 							</div>
 							<div>
+								<dt className="text-gray-500 dark:text-gray-400">Proxy voor bunq-verkeer</dt>
+								<dd className="text-gray-900 dark:text-gray-100 font-medium break-words">
+									{describeBunqProxy(bunqStatus.config)}
+								</dd>
+							</div>
+							<div className="sm:col-span-2">
+								<dt className="text-gray-500 dark:text-gray-400">IP-whitelist van de credential achter deze sessie</dt>
+								<dd className="text-gray-900 dark:text-gray-100 font-medium break-words">
+									{describeBunqWhitelists(bunqStatus.credentialWhitelists)}
+								</dd>
+							</div>
+							<div>
 								<dt className="text-gray-500 dark:text-gray-400">Vastgezette rekening</dt>
 								<dd className="text-gray-900 dark:text-gray-100 font-medium">
 									{bunqStatus.connection
@@ -618,6 +680,9 @@ export default function AdminPage() {
 					{bunqStatus?.success && (
 						<div className="mt-4 p-3 rounded-lg text-sm bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400">
 							Verbinding met bunq werkt; betaalverzoeken worden aangemaakt op rekening #{bunqStatus.connection?.pinnedAccount.id}
+							{describeBunqWhitelistUpdate(bunqStatus.whitelistUpdate) && (
+								<span className="block mt-1">{describeBunqWhitelistUpdate(bunqStatus.whitelistUpdate)}</span>
+							)}
 						</div>
 					)}
 				</div>

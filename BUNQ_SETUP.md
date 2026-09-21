@@ -69,12 +69,41 @@ NEXT_PUBLIC_BASE_URL=https://auto.nijverhoek.nl
 # Optional: set to "false" to forbid the IP wildcard when registering the
 # device. Only do this on a host with a fixed egress IP. See IP_REGISTRATION.md
 BUNQ_ALLOW_ALL_IPS=true
+
+# Required on Vercel: static-IP proxy for all bunq traffic, e.g. the FIXIE_URL
+# value of the Fixie integration (http://user:password@host:port). bunq binds
+# the access token to the IP of its first session; see IP_REGISTRATION.md
+BUNQ_HTTPS_PROXY=http://fixie:xxxxxxxx@velodrome.usefixie.com:80
+
+# The proxy's static egress IPs, comma-separated (from the proxy dashboard).
+# "Test verbinding" adds any that bunq does not list yet to the whitelist
+BUNQ_PROXY_STATIC_IPS=1.2.3.4,5.6.7.8
 ```
 
 `BUNQ_API_KEY` is no longer read; the API key is entered in the admin form
 during setup instead. Remove the variable from your environment.
 
 ## One-time setup
+
+### 0. Give the app a fixed outbound IP (Vercel)
+
+bunq only accepts calls from the IP address a credential was first used from,
+and the `*` wildcard exists only for API keys. The OAuth access token is such a
+credential: the first `session-server` call binds it to that IP. Vercel
+functions have no fixed egress IP, so without a proxy the connection works
+once and then fails with "Incorrect API key or IP address".
+
+1. Add the [Fixie](https://usefixie.com/documentation/vercel) integration from
+   the Vercel marketplace (free tier: 500 requests/month) and connect it to
+   this project. It creates `FIXIE_URL` in the project's environment.
+2. Set `BUNQ_HTTPS_PROXY` to the same value as `FIXIE_URL`, and
+   `BUNQ_PROXY_STATIC_IPS` to the outbound IPs shown in the Fixie dashboard
+   (comma-separated). Any HTTP proxy with a fixed IP works the same way.
+3. Deploy. The admin card now shows "Proxy voor bunq-verkeer" and the egress
+   IP of each test should be one of the proxy IPs.
+
+Do this **before** authorizing (step 3), or re-authorize afterwards: a token
+issued before the proxy was in place is bound to an old Vercel IP.
 
 ### 1. Create the OAuth client in the bunq app
 
@@ -125,7 +154,9 @@ See [IP_REGISTRATION.md](IP_REGISTRATION.md) for the IP strategies.
 
 Click **Test verbinding** in the "Bunq-koppeling" card. It starts a session,
 lists the accounts covered by the grant and shows which one payment requests
-are pinned to. If `BUNQ_ACCOUNT_ID_FOR_REQUESTS` is not among the granted
+are pinned to. On success it also reads the credential's IP whitelist and adds
+any `BUNQ_PROXY_STATIC_IPS` that are missing, so a proxy with two egress IPs
+does not fail half the time. Click it a few times; every run should succeed. If `BUNQ_ACCOUNT_ID_FOR_REQUESTS` is not among the granted
 accounts, the app refuses to create payment requests and reports the granted
 ids instead.
 
@@ -187,11 +218,17 @@ The former unauthenticated debug endpoints `/api/test-bunq`,
     still the old value. Store the token that step 2 returned and redeploy.
   - *Installation token rejected*: same fix; the value is stale or truncated.
   - *Device status is not ACTIVE*: confirm it in the bunq app.
-  - *Device is ACTIVE but this call came from another IP than the device
-    was registered from*: the device is IP-bound and Vercel rotated the
-    egress IP; this also explains "works on page load, fails a second
-    later". Enable **Allow all IP addresses** on the API key in the bunq app.
-  - *Device is ACTIVE and the IPs match*: the access token itself is refused. Every run of
+  - *Device is ACTIVE, and the connection works right after a fresh
+    "Koppel bunq-account" but not afterwards*: an IP binding. bunq only
+    accepts calls from the IP a credential was first used from, and Vercel
+    has no fixed egress IP. If **Allow all IP addresses** is off on the API
+    key, turn it on. If it is already on, bunq is binding the *access token*
+    to the IP of its first session; the remedy is the static-IP proxy from
+    step 0, followed by a fresh authorization. After a fresh authorization,
+    the first successful check shows the credential's IP whitelist in the
+    card ("IP-whitelist van de credential").
+  - *Device is ACTIVE and it fails even right after a fresh
+    authorization*: the access token itself is refused. Every run of
     step 3 invalidates earlier tokens, so make sure the env holds the token
     from the most recent run and redeploy. Also verify the API key (step 2)
     and the OAuth client were created under the same bunq user.

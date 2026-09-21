@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
 			},
 		],
 	},
+	// undici is used server-side for proxied bunq traffic; keep it external so
+	// its Node internals are not bundled
+	serverExternalPackages: ['undici'],
 	// Ensure CSS is properly optimized and cached
 	experimental: {
 		optimizeCss: true,

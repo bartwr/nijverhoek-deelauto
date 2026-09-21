@@ -1,6 +1,75 @@
 
 import crypto from 'crypto'
 import { networkInterfaces } from 'os'
+import { fetch as undiciFetch, ProxyAgent } from 'undici'
+
+/**
+ * Lazily created proxy dispatcher for bunq traffic. `undefined` until the
+ * environment has been read once; `null` when no proxy is configured.
+ */
+let bunqProxyAgent: ProxyAgent | null | undefined
+
+function getBunqProxyUrl (): string {
+	return (process.env.BUNQ_HTTPS_PROXY || '').trim()
+}
+
+function getBunqProxyAgent (): ProxyAgent | null {
+	if (bunqProxyAgent !== undefined) return bunqProxyAgent
+	const proxyUrl = getBunqProxyUrl()
+	bunqProxyAgent = proxyUrl === '' ? null : new ProxyAgent(proxyUrl)
+	return bunqProxyAgent
+}
+
+/**
+ * Host of the configured outbound proxy, for display in the admin UI.
+ * Credentials embedded in the URL are never returned. `null` when unset.
+ */
+export function getBunqProxyHost (): string | null {
+	const proxyUrl = getBunqProxyUrl()
+	if (proxyUrl === '') return null
+	try {
+		const url = new URL(proxyUrl)
+		return url.port ? `${url.hostname}:${url.port}` : url.hostname
+	} catch {
+		return 'ongeldige BUNQ_HTTPS_PROXY'
+	}
+}
+
+/**
+ * Static IP addresses the proxy may send traffic from, as configured in
+ * `BUNQ_PROXY_STATIC_IPS` (comma-separated). bunq binds a credential to the
+ * IP of its first use; the other addresses must be whitelisted explicitly.
+ */
+export function getBunqProxyStaticIps (): string[] {
+	return (process.env.BUNQ_PROXY_STATIC_IPS || '')
+		.split(',')
+		.map(ip => ip.trim())
+		.filter(ip => /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(ip))
+}
+
+interface BunqFetchInit {
+	method?: string
+	headers?: Record<string, string>
+	body?: string
+}
+
+/**
+ * `fetch` for all traffic to bunq (and the IP echo services).
+ *
+ * bunq whitelists the IP a credential was first used from, and Vercel has
+ * no fixed egress IP. When `BUNQ_HTTPS_PROXY` is set (for example the
+ * `FIXIE_URL` of a static-IP proxy) every request is sent through that
+ * proxy so bunq always sees the same address. undici's own `fetch` is used
+ * together with its `ProxyAgent` so the two are guaranteed to match.
+ */
+async function bunqFetch (url: string, init: BunqFetchInit = {}): Promise<Response> {
+	const agent = getBunqProxyAgent()
+	if (!agent) {
+		return fetch(url, init)
+	}
+	const response = await undiciFetch(url, { ...init, dispatcher: agent })
+	return response as unknown as Response
+}
 
 export interface BunqPaymentRequest {
 	amount_inquired: {
@@ -174,6 +243,23 @@ export interface BunqDeviceServerSummary {
 	created: string
 }
 
+/**
+ * IP whitelist of one server credential, as seen from the current session.
+ */
+export interface BunqCredentialIpSummary {
+	credentialId: number
+	status: string
+	ips: Array<{ ip: string; status: string }>
+}
+
+/**
+ * Outcome of adding proxy IP addresses to the credential whitelist(s).
+ */
+export interface BunqWhitelistUpdateResult {
+	added: Array<{ credentialId: number; ip: string }>
+	failed: Array<{ credentialId: number; ip: string; error: string }>
+}
+
 export interface BunqApiContext {
 	sessionToken: string
 	/**
@@ -214,6 +300,8 @@ interface BunqApiResponse {
 			ip?: string
 			status?: string
 		};
+		CredentialPasswordIp?: { id: number; status?: string };
+		PermittedIp?: { id?: number; ip?: string; status?: string };
 	}>;
 }
 
@@ -246,7 +334,7 @@ export async function getExternalIpAddress(): Promise<string> {
 				
 				// Race between fetch and timeout
 				const response = await Promise.race([
-					fetch(service, {
+					bunqFetch(service, {
 						headers: {
 							'User-Agent': 'nijverhoek-deelauto/1.0'
 						}
@@ -515,7 +603,7 @@ class BunqApiClient {
 			hasSignature: !!signature
 		})
 
-		const response = await fetch(`${this.baseUrl}/v1/session-server`, {
+		const response = await bunqFetch(`${this.baseUrl}/v1/session-server`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -562,7 +650,7 @@ class BunqApiClient {
 			throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is not set')
 		}
 
-		const response = await fetch(`${this.baseUrl}/v1/device-server`, {
+		const response = await bunqFetch(`${this.baseUrl}/v1/device-server`, {
 			method: 'GET',
 			headers: {
 				'Cache-Control': 'no-cache',
@@ -603,6 +691,125 @@ class BunqApiClient {
 	}
 
 	/**
+	 * Lists the server credentials visible to the current session together
+	 * with their IP whitelists (`GET /user/{id}/credential-password-ip` and
+	 * `.../ip`). Diagnostic only: it shows whether the credential behind this
+	 * session is bound to specific IP addresses or carries the `*` wildcard.
+	 * Requires an initialized context; throws when bunq refuses the call.
+	 */
+	async listCredentialIpWhitelists(): Promise<BunqCredentialIpSummary[]> {
+		if (!this.context) {
+			throw new Error('Bunq context not initialized')
+		}
+		const { sessionToken, userId } = this.context
+		const headers = {
+			'X-Bunq-Client-Authentication': sessionToken,
+			'X-Bunq-Client-Request-Id': this.generateRequestId(),
+			'X-Bunq-Geolocation': '0 0 0 0 NL',
+			'X-Bunq-Language': 'nl_NL',
+			'X-Bunq-Region': 'nl_NL'
+		}
+
+		const credentialsResponse = await bunqFetch(
+			`${this.baseUrl}/v1/user/${userId}/credential-password-ip`,
+			{ method: 'GET', headers }
+		)
+		if (!credentialsResponse.ok) {
+			const errorText = await credentialsResponse.text()
+			throw new Error(`Listing credentials failed: ${credentialsResponse.status} - ${errorText}`)
+		}
+		const credentialsData = await credentialsResponse.json() as BunqApiResponse
+
+		const summaries: BunqCredentialIpSummary[] = []
+		for (const item of credentialsData.Response ?? []) {
+			const credential = item.CredentialPasswordIp
+			if (!credential) continue
+
+			const ipsResponse = await bunqFetch(
+				`${this.baseUrl}/v1/user/${userId}/credential-password-ip/${credential.id}/ip`,
+				{ method: 'GET', headers: { ...headers, 'X-Bunq-Client-Request-Id': this.generateRequestId() } }
+			)
+			if (!ipsResponse.ok) {
+				const errorText = await ipsResponse.text()
+				throw new Error(`Listing IPs for credential ${credential.id} failed: ${ipsResponse.status} - ${errorText}`)
+			}
+			const ipsData = await ipsResponse.json() as BunqApiResponse
+
+			summaries.push({
+				credentialId: credential.id,
+				status: credential.status ?? 'UNKNOWN',
+				ips: (ipsData.Response ?? [])
+					.map(entry => entry.PermittedIp)
+					.filter((entry): entry is NonNullable<typeof entry> => !!entry)
+					.map(entry => ({ ip: entry.ip ?? '?', status: entry.status ?? 'UNKNOWN' }))
+			})
+		}
+
+		console.log('Credential IP whitelists:', summaries)
+		return summaries
+	}
+
+	/**
+	 * Adds `ips` as ACTIVE entries to every credential visible to the
+	 * session that does not list them yet
+	 * (`POST /user/{id}/credential-password-ip/{cid}/ip`).
+	 *
+	 * Used for the static IPs of the outbound proxy: bunq whitelists only the
+	 * address a credential was first used from, so a proxy with two egress
+	 * addresses would fail half the time until the second one is added. Only
+	 * works while the current call itself comes from a whitelisted IP.
+	 */
+	async ensureCredentialIpsWhitelisted(ips: string[]): Promise<BunqWhitelistUpdateResult> {
+		const result: BunqWhitelistUpdateResult = { added: [], failed: [] }
+		if (ips.length === 0) return result
+		if (!this.context) {
+			throw new Error('Bunq context not initialized')
+		}
+		const { sessionToken, userId } = this.context
+
+		const credentials = await this.listCredentialIpWhitelists()
+		for (const credential of credentials) {
+			const known = new Set(credential.ips.map(entry => entry.ip))
+			if (known.has('*')) continue
+
+			for (const ip of ips) {
+				if (known.has(ip)) continue
+
+				const response = await bunqFetch(
+					`${this.baseUrl}/v1/user/${userId}/credential-password-ip/${credential.credentialId}/ip`,
+					{
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+							'X-Bunq-Client-Authentication': sessionToken,
+							'X-Bunq-Client-Request-Id': this.generateRequestId(),
+							'X-Bunq-Geolocation': '0 0 0 0 NL',
+							'X-Bunq-Language': 'nl_NL',
+							'X-Bunq-Region': 'nl_NL'
+						},
+						body: JSON.stringify({ ip, status: 'ACTIVE' })
+					}
+				)
+
+				if (response.ok) {
+					console.log(`Whitelisted proxy IP ${ip} on credential ${credential.credentialId}`)
+					result.added.push({ credentialId: credential.credentialId, ip })
+				} else {
+					const errorText = await response.text()
+					console.warn(`Whitelisting ${ip} on credential ${credential.credentialId} failed: ${response.status} - ${errorText}`)
+					result.failed.push({
+						credentialId: credential.credentialId,
+						ip,
+						error: `${response.status} - ${errorText}`
+					})
+				}
+			}
+		}
+
+		return result
+	}
+
+	/**
 	 * Extract the user id to use in URLs from a session-server response.
 	 *
 	 * bunq returns `UserApiKey` for OAuth sessions and `UserPerson` /
@@ -630,7 +837,7 @@ class BunqApiClient {
 		sessionToken: string,
 		userId: number
 	): Promise<BunqMonetaryAccountSummary[]> {
-		const response = await fetch(`${this.baseUrl}/v1/user/${userId}/monetary-account`, {
+		const response = await bunqFetch(`${this.baseUrl}/v1/user/${userId}/monetary-account`, {
 			method: 'GET',
 			headers: {
 				'X-Bunq-Client-Authentication': sessionToken,
@@ -741,7 +948,7 @@ class BunqApiClient {
 
 		const { sessionToken, userId, monetaryAccountId } = this.context
 
-		const response = await fetch(
+		const response = await bunqFetch(
 			`${this.baseUrl}/v1/user/${userId}/monetary-account/${monetaryAccountId}/request-inquiry`,
 			{
 				method: 'POST',
@@ -792,7 +999,7 @@ class BunqApiClient {
 
 		const { sessionToken, userId, monetaryAccountId } = this.context
 
-		const response = await fetch(
+		const response = await bunqFetch(
 			`${this.baseUrl}/v1/user/${userId}/monetary-account/${monetaryAccountId}/bunqme-tab`,
 			{
 				method: 'POST',
@@ -839,7 +1046,7 @@ class BunqApiClient {
 
 		const { sessionToken, userId, monetaryAccountId } = this.context
 
-		const response = await fetch(
+		const response = await bunqFetch(
 			`${this.baseUrl}/v1/user/${userId}/monetary-account/${monetaryAccountId}/request-inquiry/${requestId}`,
 			{
 				method: 'GET',
@@ -880,7 +1087,7 @@ class BunqApiClient {
 
 		const { sessionToken, userId, monetaryAccountId } = this.context
 
-		const response = await fetch(
+		const response = await bunqFetch(
 			`${this.baseUrl}/v1/user/${userId}/monetary-account/${monetaryAccountId}/bunqme-tab/${tabId}`,
 			{
 				method: 'GET',
@@ -1050,7 +1257,7 @@ class BunqApiClient {
 		const clientPublicKey = this.getClientPublicKeyPem()
 
 		console.log('Creating new bunq installation...')
-		const response = await fetch(`${this.baseUrl}/v1/installation`, {
+		const response = await bunqFetch(`${this.baseUrl}/v1/installation`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -1104,7 +1311,7 @@ class BunqApiClient {
 		console.log('Registering device-server with bunq API...', {
 			permittedIps: permittedIps ?? '(calling IP, chosen by bunq)'
 		})
-		const response = await fetch(`${this.baseUrl}/v1/device-server`, {
+		const response = await bunqFetch(`${this.baseUrl}/v1/device-server`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',

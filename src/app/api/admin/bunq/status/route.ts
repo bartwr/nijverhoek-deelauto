@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { hasValidAdminSession } from '@/lib/session-auth'
 import {
 	bunqApi,
+	BunqCredentialIpSummary,
 	BunqDeviceServerSummary,
 	BunqMonetaryAccountSummary,
+	BunqWhitelistUpdateResult,
 	getExternalIpAddress,
 } from '@/lib/bunq-api'
 import { getBunqOAuthConfigStatus, getBunqOAuthRedirectUri } from '@/lib/bunq-oauth'
@@ -35,6 +37,16 @@ interface BunqStatusResponse {
 		pinnedAccount: BunqMonetaryAccountSummary
 		grantedAccounts: BunqMonetaryAccountSummary[]
 	}
+	/**
+	 * IP whitelists of the credentials visible to the session, or the reason
+	 * bunq would not show them. Only available after a successful session.
+	 */
+	credentialWhitelists?: {
+		credentials: BunqCredentialIpSummary[]
+		error?: string
+	}
+	/** Proxy IPs added to the whitelist during this check, if any. */
+	whitelistUpdate?: BunqWhitelistUpdateResult & { error?: string }
 	error?: string
 	/** Most likely cause of `error`, derived from the installation state. */
 	hint?: string
@@ -106,27 +118,62 @@ function explainSessionFailure (
 	}
 
 	const boundIps = installation.devices.map(device => device.ip).filter(ip => ip !== '')
-	const callsFromRegisteredIp = boundIps.includes(egressIp)
 
-	if (!callsFromRegisteredIp) {
+	if (config.proxyHost) {
 		return (
-			`Deze aanroep kwam van IP ${egressIp}, maar het apparaat is geregistreerd vanaf ` +
-			`${boundIps.join(', ') || 'een ander IP'}. bunq bindt een apparaat aan dat ene IP; een "*" in ` +
-			'permitted_ips wordt door de API genegeerd. Vercel wisselt van uitgaand IP, dus soms lukt het en ' +
-			'soms niet. Oplossing: zet in de bunq-app bij deze API-sleutel "Allow all IP addresses" aan ' +
-			'(Profiel > Beveiliging > API-sleutels) en test opnieuw. Helpt dat niet, registreer het apparaat ' +
-			'daarna nog één keer en zet de nieuwe installatietoken in de omgeving.'
+			`bunq-verkeer loopt via proxy ${config.proxyHost}; deze aanroep kwam van ${egressIp}. Is het access ` +
+			`token (eindigt op \u2026${accessTokenSuffix}) afgegeven vóórdat de proxy was ingesteld, dan is het ` +
+			'nog gebonden aan een oud Vercel-IP: doe "Koppel bunq-account" opnieuw, zet het nieuwe token en ' +
+			'deploy. De eerste sessie bindt het token dan aan het proxy-IP. Zet daarnaast alle vaste IP\u2019s ' +
+			'van de proxy in BUNQ_PROXY_STATIC_IPS; bij een geslaagde test worden ontbrekende IP\u2019s aan de ' +
+			'whitelist toegevoegd.'
 		)
 	}
 
 	return (
-		'De installatie heeft een actief apparaat en deze aanroep kwam van het geregistreerde IP, dus bunq ' +
-		`weigert het access token zelf (eindigt op \u2026${accessTokenSuffix}). Controleer: (1) ` +
-		'BUNQ_OAUTH_ACCESS_TOKEN is de token van de laatste "Koppel bunq-account"; elke nieuwe koppeling ' +
-		'maakt eerdere tokens ongeldig. (2) De API-sleutel waarmee het apparaat is geregistreerd en de ' +
-		'OAuth-client zijn aangemaakt onder dezelfde bunq-gebruiker (persoonlijk vs. zakelijk). ' +
-		'(3) Sandbox en productie zijn niet gemengd.'
+		`Het apparaat is actief (geregistreerd vanaf ${boundIps.join(', ') || 'onbekend IP'}); deze aanroep ` +
+		`kwam van ${egressIp}. Werkt de verbinding wel direct na een nieuwe "Koppel bunq-account" en daarna ` +
+		'niet meer, dan is dit een IP-binding: bunq staat alleen aanroepen toe vanaf het IP waarvandaan een ' +
+		'credential het eerst is gebruikt, en Vercel heeft geen vast uitgaand IP. Staat "Allow all IP ' +
+		'addresses" voor de API-sleutel UIT, zet het aan. Staat het AAN, dan bindt bunq het access token ' +
+		`(eindigt op \u2026${accessTokenSuffix}) zelf aan het IP van zijn eerste sessie; dat is alleen op te ` +
+		'lossen door de bunq-aanroepen via een vast IP te laten lopen. Koppel opnieuw en open /admin één ' +
+		'keer: de rij "IP-whitelist van de credential" laat dan zien welke IP\u2019s bunq toestaat. ' +
+		'Werkt het ook direct na een nieuwe koppeling niet, controleer dan of API-sleutel en OAuth-client ' +
+		'onder dezelfde bunq-gebruiker vallen en of sandbox en productie niet gemengd zijn.'
 	)
+}
+
+/**
+ * While the session works (so this call comes from a whitelisted IP), adds
+ * the proxy's other static IPs to the credential whitelist. Never throws.
+ */
+async function whitelistProxyIps (
+	proxyStaticIps: string[]
+): Promise<BunqStatusResponse['whitelistUpdate']> {
+	if (proxyStaticIps.length === 0) return undefined
+	try {
+		return await bunqApi.ensureCredentialIpsWhitelisted(proxyStaticIps)
+	} catch (error) {
+		const message = error instanceof Error ? error.message : 'Onbekende fout'
+		console.warn('bunq proxy IP whitelisting failed:', message)
+		return { added: [], failed: [], error: message }
+	}
+}
+
+/**
+ * Reads the credential IP whitelists after a successful session. Never
+ * throws; bunq may refuse this under an OAuth session, which is itself
+ * useful to know.
+ */
+async function inspectCredentialWhitelists (): Promise<BunqStatusResponse['credentialWhitelists']> {
+	try {
+		return { credentials: await bunqApi.listCredentialIpWhitelists() }
+	} catch (error) {
+		const message = error instanceof Error ? error.message : 'Onbekende fout'
+		console.warn('bunq credential whitelist lookup failed:', message)
+		return { credentials: [], error: message }
+	}
 }
 
 /**
@@ -174,6 +221,8 @@ export async function GET (request: NextRequest): Promise<NextResponse<BunqStatu
 
 	try {
 		const context = await bunqApi.initializeContext()
+		const whitelistUpdate = await whitelistProxyIps(config.proxyStaticIps)
+		const credentialWhitelists = await inspectCredentialWhitelists()
 
 		return NextResponse.json({
 			success: true,
@@ -186,6 +235,8 @@ export async function GET (request: NextRequest): Promise<NextResponse<BunqStatu
 				pinnedAccount: maskAccount(context.account),
 				grantedAccounts: context.grantedAccounts.map(maskAccount),
 			},
+			credentialWhitelists,
+			whitelistUpdate,
 		})
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Onbekende fout bij het verbinden met bunq'
