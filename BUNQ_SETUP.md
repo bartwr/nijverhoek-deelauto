@@ -161,7 +161,7 @@ All bunq endpoints require a session:
 |----------|------|---------|
 | `GET /api/admin/bunq/oauth/start` | admin | Redirects to the bunq authorization page |
 | `GET /api/admin/bunq/oauth/callback` | admin | Exchanges the code, shows the token once |
-| `GET /api/admin/bunq/status` | admin | Config check and connection test (no secret values) |
+| `GET /api/admin/bunq/status` | admin | Config check, device listing and connection test (secrets limited to a 4-char suffix) |
 | `POST /api/admin/bunq/setup` | admin | Creates an installation and registers the device, using an API key from the request body |
 | `GET|POST /api/payments/sync-bunq-status` | admin or member | Syncs payment statuses |
 
@@ -176,10 +176,19 @@ The former unauthenticated debug endpoints `/api/test-bunq`,
   create the OAuth client in the bunq app and set both variables.
 - **"De state komt niet overeen"**: the CSRF cookie expired (10 minutes) or
   the flow was started in another browser. Start again from `/admin`.
-- **"Session start failed: ... Incorrect API key or IP address"**: the
-  installation in `BUNQ_INSTALLATION_RESPONSE_TOKEN` has no device, its device
-  does not cover this server's IP, or the access token was revoked. Run step 2
-  again, then step 3 if needed.
+- **"Session start failed: ... Incorrect API key or IP address"**: bunq uses
+  this message for several problems. **Test verbinding** now lists the device
+  on the configured installation (via `GET /device-server`, which only needs
+  the installation token) and shows the last four characters of both tokens,
+  then names the likely cause:
+  - *No device on this installation*: `BUNQ_INSTALLATION_RESPONSE_TOKEN` is
+    still the old value. Store the token that step 2 returned and redeploy.
+  - *Installation token rejected*: same fix; the value is stale or truncated.
+  - *Device status is not ACTIVE*: confirm it in the bunq app.
+  - *Device is ACTIVE*: the access token itself is refused. Every run of
+    step 3 invalidates earlier tokens, so make sure the env holds the token
+    from the most recent run and redeploy. Also verify the API key (step 2)
+    and the OAuth client were created under the same bunq user.
 - **"A device already exists for the current installation"**: an installation
   carries one device. Step 2 always creates a fresh installation, so this
   should no longer occur.

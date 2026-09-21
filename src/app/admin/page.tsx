@@ -27,24 +27,48 @@ interface BunqAccountSummary {
 	status: string
 }
 
+interface BunqDeviceSummary {
+	id: number
+	description: string
+	ip: string
+	status: string
+	created: string
+}
+
 interface BunqStatus {
 	success: boolean
 	config: {
 		hasClientId: boolean
 		hasClientSecret: boolean
 		hasAccessToken: boolean
+		accessTokenSuffix: string | null
 		hasInstallationToken: boolean
+		installationTokenSuffix: string | null
 		hasPrivateKey: boolean
 		configuredAccountId: string | null
 		isSandbox: boolean
 	}
 	redirectUri: string
+	installation?: {
+		devices: BunqDeviceSummary[]
+		error?: string
+	}
 	connection?: {
 		userId: number
 		pinnedAccount: BunqAccountSummary
 		grantedAccounts: BunqAccountSummary[]
 	}
 	error?: string
+	hint?: string
+}
+
+function describeBunqDevices (installation: BunqStatus['installation']): string {
+	if (!installation) return '-'
+	if (installation.error) return 'Installatietoken wordt geweigerd door bunq'
+	if (installation.devices.length === 0) return 'Geen apparaat op deze installatie'
+	return installation.devices
+		.map(device => `${device.description || 'Apparaat'} · ${device.status} · IP ${device.ip || '?'}`)
+		.join('; ')
 }
 
 export default function AdminPage() {
@@ -435,8 +459,24 @@ export default function AdminPage() {
 							<div>
 								<dt className="text-gray-500 dark:text-gray-400">Access token</dt>
 								<dd className="text-gray-900 dark:text-gray-100 font-medium">
-									{bunqStatus.config.hasAccessToken ? 'Ingesteld' : 'Ontbreekt'}
+									{bunqStatus.config.hasAccessToken
+										? `Ingesteld (eindigt op …${bunqStatus.config.accessTokenSuffix})`
+										: 'Ontbreekt'}
 									{bunqStatus.config.isSandbox ? ' (sandbox)' : ''}
+								</dd>
+							</div>
+							<div>
+								<dt className="text-gray-500 dark:text-gray-400">Installatietoken</dt>
+								<dd className="text-gray-900 dark:text-gray-100 font-medium">
+									{bunqStatus.config.hasInstallationToken
+										? `Ingesteld (eindigt op …${bunqStatus.config.installationTokenSuffix})`
+										: 'Ontbreekt'}
+								</dd>
+							</div>
+							<div>
+								<dt className="text-gray-500 dark:text-gray-400">Geregistreerd apparaat op die installatie</dt>
+								<dd className="text-gray-900 dark:text-gray-100 font-medium">
+									{describeBunqDevices(bunqStatus.installation)}
 								</dd>
 							</div>
 							<div>
@@ -554,8 +594,15 @@ export default function AdminPage() {
 					)}
 
 					{bunqStatus && !bunqStatus.success && bunqStatus.error && (
-						<div className="mt-4 p-3 rounded-lg text-sm bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400">
+						<div className="mt-4 p-3 rounded-lg text-sm bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 break-words">
 							{bunqStatus.error}
+						</div>
+					)}
+
+					{bunqStatus && !bunqStatus.success && bunqStatus.hint && (
+						<div className="mt-2 p-3 rounded-lg text-sm bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 leading-relaxed">
+							<span className="font-medium">Waarschijnlijke oorzaak: </span>
+							{bunqStatus.hint}
 						</div>
 					)}
 

@@ -148,6 +148,19 @@ export interface BunqApiContextSetupResult {
 	installationToken?: string
 }
 
+/**
+ * A device-server registered on the installation the app uses.
+ */
+export interface BunqDeviceServerSummary {
+	id: number
+	description: string
+	/** IP address bunq bound the device to at registration time. */
+	ip: string
+	/** `ACTIVE`, `BLOCKED`, `NEEDS_CONFIRMATION` or `OBSOLETE`. */
+	status: string
+	created: string
+}
+
 export interface BunqApiContext {
 	sessionToken: string
 	/**
@@ -181,6 +194,13 @@ interface BunqApiResponse {
 		MonetaryAccountBank?: BunqMonetaryAccountRaw;
 		MonetaryAccountSavings?: BunqMonetaryAccountRaw;
 		MonetaryAccountJoint?: BunqMonetaryAccountRaw;
+		DeviceServer?: {
+			id: number
+			created?: string
+			description?: string
+			ip?: string
+			status?: string
+		};
 	}>;
 }
 
@@ -511,6 +531,62 @@ class BunqApiClient {
 		}
 
 		return response.json()
+	}
+
+	/**
+	 * GET /device-server: list the devices registered on the installation
+	 * that `BUNQ_INSTALLATION_RESPONSE_TOKEN` points to.
+	 *
+	 * This call is authenticated with the installation token alone, so it
+	 * works before a session exists. It is the cheapest way to tell whether
+	 * the configured installation token is the one returned by the latest
+	 * device registration: a stale token yields an empty list (or an auth
+	 * error), the right one lists the device with its IP and status.
+	 */
+	async listInstallationDevices(): Promise<BunqDeviceServerSummary[]> {
+		const installationToken = (process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN || '').trim()
+		if (!installationToken) {
+			throw new Error('BUNQ_INSTALLATION_RESPONSE_TOKEN environment variable is not set')
+		}
+
+		const response = await fetch(`${this.baseUrl}/v1/device-server`, {
+			method: 'GET',
+			headers: {
+				'Cache-Control': 'no-cache',
+				'User-Agent': 'nijverhoek-deelauto/1.0',
+				'X-Bunq-Client-Request-Id': this.generateRequestId(),
+				'X-Bunq-Geolocation': '0 0 0 0 NL',
+				'X-Bunq-Language': 'nl_NL',
+				'X-Bunq-Region': 'nl_NL',
+				'X-Bunq-Client-Authentication': installationToken
+			}
+		})
+
+		if (!response.ok) {
+			const errorText = await response.text()
+			throw new Error(`Listing device-servers failed: ${response.status} ${response.statusText} - ${errorText}`)
+		}
+
+		const data = await response.json() as BunqApiResponse
+		const devices: BunqDeviceServerSummary[] = []
+		for (const item of data.Response ?? []) {
+			const raw = item.DeviceServer
+			if (!raw) continue
+			devices.push({
+				id: raw.id,
+				description: raw.description ?? '',
+				ip: raw.ip ?? '',
+				status: raw.status ?? 'UNKNOWN',
+				created: raw.created ?? ''
+			})
+		}
+
+		console.log('Devices on configured installation:', devices.map(device => ({
+			id: device.id,
+			status: device.status
+		})))
+
+		return devices
 	}
 
 	/**

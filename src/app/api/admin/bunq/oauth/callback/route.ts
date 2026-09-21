@@ -128,7 +128,8 @@ export async function GET (request: NextRequest): Promise<NextResponse> {
 die je in de bunq-app hebt geselecteerd${isSandbox ? ' (sandbox)' : ''}. Dit token kan geen geld
 naar derden overmaken.</p>
 <div class="warn">Dit token wordt maar één keer getoond en wordt nergens opgeslagen.
-Kopieer het nu.</div>
+Kopieer het nu. Een eerder afgegeven token is hiermee ongeldig geworden; zolang dat
+oude token in de omgeving staat, mislukt de verbinding met &quot;Incorrect API key or IP address&quot;.</div>
 <h2>BUNQ_OAUTH_ACCESS_TOKEN</h2>
 <pre id="token">${escapeHtml(accessToken)}</pre>
 <h2>Volgende stappen</h2>

@@ -41,23 +41,40 @@ export function getBunqOAuthRedirectUri (fallbackOrigin?: string): string {
 }
 
 /**
- * Reports which OAuth-related environment variables are present, without
- * exposing their values.
+ * Last four characters of a secret, enough to tell two tokens apart in the
+ * admin UI without revealing anything usable. `null` when unset.
+ */
+function tokenSuffix (value: string | undefined): string | null {
+	const trimmed = (value ?? '').trim()
+	return trimmed === '' ? null : trimmed.slice(-4)
+}
+
+/**
+ * Reports which OAuth-related environment variables are present. Secret
+ * values are not exposed beyond the last four characters of the two tokens,
+ * so an admin can verify the deployed values match the ones bunq issued.
  */
 export function getBunqOAuthConfigStatus (): {
 	hasClientId: boolean
 	hasClientSecret: boolean
 	hasAccessToken: boolean
+	accessTokenSuffix: string | null
 	hasInstallationToken: boolean
+	installationTokenSuffix: string | null
 	hasPrivateKey: boolean
 	configuredAccountId: string | null
 	isSandbox: boolean
 } {
+	const accessToken = process.env.BUNQ_OAUTH_ACCESS_TOKEN
+	const installationToken = process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN
+
 	return {
 		hasClientId: (process.env.BUNQ_OAUTH_CLIENT_ID ?? '').trim() !== '',
 		hasClientSecret: (process.env.BUNQ_OAUTH_CLIENT_SECRET ?? '').trim() !== '',
-		hasAccessToken: (process.env.BUNQ_OAUTH_ACCESS_TOKEN ?? '').trim() !== '',
-		hasInstallationToken: (process.env.BUNQ_INSTALLATION_RESPONSE_TOKEN ?? '').trim() !== '',
+		hasAccessToken: tokenSuffix(accessToken) !== null,
+		accessTokenSuffix: tokenSuffix(accessToken),
+		hasInstallationToken: tokenSuffix(installationToken) !== null,
+		installationTokenSuffix: tokenSuffix(installationToken),
 		hasPrivateKey: (process.env.BUNQ_PRIVATE_KEY_FOR_SIGNING ?? '').trim() !== '',
 		configuredAccountId: (process.env.BUNQ_ACCOUNT_ID_FOR_REQUESTS ?? '').trim() || null,
 		isSandbox: isSandboxEnvironment(),
