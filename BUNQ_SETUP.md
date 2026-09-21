@@ -89,9 +89,11 @@ during setup instead. Remove the variable from your environment.
 ### 2. Register the device
 
 In the bunq app, open the API key you want to use for this step and turn on
-**Allow all IP addresses**. Without it the registration is pinned to one IP
-address and has to be repeated whenever the hosting platform changes its
-egress IP.
+**Allow all IP addresses**. This is not optional on Vercel: bunq pins the
+device to the IP of the registration request (a `"*"` sent via the API is
+ignored and the wildcard can only be enabled in the app), and Vercel's egress
+IP changes between invocations, so an IP-bound device works only part of the
+time.
 
 Then log in to `/admin`, and in the "Bunq-koppeling" card paste that API key
 into **Apparaat registreren bij bunq** and submit. The app:
@@ -99,7 +101,7 @@ into **Apparaat registreren bij bunq** and submit. The app:
 1. creates an installation for the RSA key pair in
    `BUNQ_PRIVATE_KEY_FOR_SIGNING` (`POST /installation`),
 2. registers a device on it with the API key as the secret
-   (`POST /device-server`), preferring `permitted_ips: ["<ip>", "*"]`,
+   (`POST /device-server`), preferring `permitted_ips: ["*"]`,
 3. shows the new installation token **once** and forgets the API key.
 
 Store that token as `BUNQ_INSTALLATION_RESPONSE_TOKEN` and redeploy. An
@@ -185,7 +187,11 @@ The former unauthenticated debug endpoints `/api/test-bunq`,
     still the old value. Store the token that step 2 returned and redeploy.
   - *Installation token rejected*: same fix; the value is stale or truncated.
   - *Device status is not ACTIVE*: confirm it in the bunq app.
-  - *Device is ACTIVE*: the access token itself is refused. Every run of
+  - *Device is ACTIVE but this call came from another IP than the device
+    was registered from*: the device is IP-bound and Vercel rotated the
+    egress IP; this also explains "works on page load, fails a second
+    later". Enable **Allow all IP addresses** on the API key in the bunq app.
+  - *Device is ACTIVE and the IPs match*: the access token itself is refused. Every run of
     step 3 invalidates earlier tokens, so make sure the env holds the token
     from the most recent run and redeploy. Also verify the API key (step 2)
     and the OAuth client were created under the same bunq user.

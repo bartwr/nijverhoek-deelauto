@@ -4,6 +4,7 @@ import {
 	bunqApi,
 	BunqDeviceServerSummary,
 	BunqMonetaryAccountSummary,
+	getExternalIpAddress,
 } from '@/lib/bunq-api'
 import { getBunqOAuthConfigStatus, getBunqOAuthRedirectUri } from '@/lib/bunq-oauth'
 
@@ -23,6 +24,11 @@ interface BunqStatusResponse {
 	success: boolean
 	config: ReturnType<typeof getBunqOAuthConfigStatus>
 	redirectUri: string
+	/**
+	 * Public IP this invocation made its outbound calls from. On Vercel this
+	 * changes between invocations, which matters for IP-bound devices.
+	 */
+	egressIp?: string
 	installation?: BunqInstallationStatus
 	connection?: {
 		userId: number
@@ -66,7 +72,8 @@ async function inspectInstallation (): Promise<BunqInstallationStatus> {
 function explainSessionFailure (
 	sessionError: string,
 	installation: BunqInstallationStatus,
-	config: ReturnType<typeof getBunqOAuthConfigStatus>
+	config: ReturnType<typeof getBunqOAuthConfigStatus>,
+	egressIp: string
 ): string | undefined {
 	if (!sessionError.includes('Incorrect API key or IP address')) {
 		return undefined
@@ -98,12 +105,27 @@ function explainSessionFailure (
 		)
 	}
 
+	const boundIps = installation.devices.map(device => device.ip).filter(ip => ip !== '')
+	const callsFromRegisteredIp = boundIps.includes(egressIp)
+
+	if (!callsFromRegisteredIp) {
+		return (
+			`Deze aanroep kwam van IP ${egressIp}, maar het apparaat is geregistreerd vanaf ` +
+			`${boundIps.join(', ') || 'een ander IP'}. bunq bindt een apparaat aan dat ene IP; een "*" in ` +
+			'permitted_ips wordt door de API genegeerd. Vercel wisselt van uitgaand IP, dus soms lukt het en ' +
+			'soms niet. Oplossing: zet in de bunq-app bij deze API-sleutel "Allow all IP addresses" aan ' +
+			'(Profiel > Beveiliging > API-sleutels) en test opnieuw. Helpt dat niet, registreer het apparaat ' +
+			'daarna nog één keer en zet de nieuwe installatietoken in de omgeving.'
+		)
+	}
+
 	return (
-		'De installatie heeft een actief apparaat, dus bunq weigert het access token zelf ' +
-		`(eindigt op \u2026${accessTokenSuffix}). Controleer: (1) BUNQ_OAUTH_ACCESS_TOKEN is de token van de ` +
-		'laatste "Koppel bunq-account"; elke nieuwe koppeling maakt eerdere tokens ongeldig. ' +
-		'(2) De API-sleutel waarmee het apparaat is geregistreerd en de OAuth-client zijn aangemaakt onder ' +
-		'dezelfde bunq-gebruiker (persoonlijk vs. zakelijk). (3) Sandbox en productie zijn niet gemengd.'
+		'De installatie heeft een actief apparaat en deze aanroep kwam van het geregistreerde IP, dus bunq ' +
+		`weigert het access token zelf (eindigt op \u2026${accessTokenSuffix}). Controleer: (1) ` +
+		'BUNQ_OAUTH_ACCESS_TOKEN is de token van de laatste "Koppel bunq-account"; elke nieuwe koppeling ' +
+		'maakt eerdere tokens ongeldig. (2) De API-sleutel waarmee het apparaat is geregistreerd en de ' +
+		'OAuth-client zijn aangemaakt onder dezelfde bunq-gebruiker (persoonlijk vs. zakelijk). ' +
+		'(3) Sandbox en productie zijn niet gemengd.'
 	)
 }
 
@@ -134,13 +156,17 @@ export async function GET (request: NextRequest): Promise<NextResponse<BunqStatu
 		})
 	}
 
-	const installation = await inspectInstallation()
+	const [installation, egressIp] = await Promise.all([
+		inspectInstallation(),
+		getExternalIpAddress().catch(() => 'Unknown'),
+	])
 
 	if (!config.hasAccessToken) {
 		return NextResponse.json({
 			success: false,
 			config,
 			redirectUri,
+			egressIp,
 			installation,
 			error: 'BUNQ_OAUTH_ACCESS_TOKEN is nog niet ingesteld. Koppel eerst het bunq-account.',
 		})
@@ -153,6 +179,7 @@ export async function GET (request: NextRequest): Promise<NextResponse<BunqStatu
 			success: true,
 			config,
 			redirectUri,
+			egressIp,
 			installation,
 			connection: {
 				userId: context.userId,
@@ -168,9 +195,10 @@ export async function GET (request: NextRequest): Promise<NextResponse<BunqStatu
 			success: false,
 			config,
 			redirectUri,
+			egressIp,
 			installation,
 			error: message,
-			hint: explainSessionFailure(message, installation, config),
+			hint: explainSessionFailure(message, installation, config, egressIp),
 		})
 	}
 }

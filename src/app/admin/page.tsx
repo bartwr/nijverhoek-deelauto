@@ -49,6 +49,7 @@ interface BunqStatus {
 		isSandbox: boolean
 	}
 	redirectUri: string
+	egressIp?: string
 	installation?: {
 		devices: BunqDeviceSummary[]
 		error?: string
@@ -480,6 +481,12 @@ export default function AdminPage() {
 								</dd>
 							</div>
 							<div>
+								<dt className="text-gray-500 dark:text-gray-400">Uitgaand IP van deze test</dt>
+								<dd className="text-gray-900 dark:text-gray-100 font-medium">
+									{bunqStatus.egressIp ?? '-'}
+								</dd>
+							</div>
+							<div>
 								<dt className="text-gray-500 dark:text-gray-400">Vastgezette rekening</dt>
 								<dd className="text-gray-900 dark:text-gray-100 font-medium">
 									{bunqStatus.connection
@@ -535,8 +542,10 @@ export default function AdminPage() {
 						<p className="text-sm text-gray-600 dark:text-gray-300 mb-3 leading-relaxed">
 							bunq accepteert alleen een API-sleutel om dit apparaat te registreren. De sleutel
 							wordt alleen voor deze ene aanroep gebruikt en nergens opgeslagen; daarna werkt de
-							app met het OAuth-token. Zet in de bunq-app &quot;Allow all IP addresses&quot; aan,
-							anders moet je dit bij elke IP-wijziging herhalen.
+							app met het OAuth-token. bunq bindt het apparaat aan het IP van deze ene aanroep en
+							negeert een &quot;*&quot; via de API. Omdat Vercel van uitgaand IP wisselt, moet je in
+							de bunq-app bij deze API-sleutel &quot;Allow all IP addresses&quot; aanzetten, anders
+							werkt de verbinding maar af en toe.
 						</p>
 						<div className="flex flex-col sm:flex-row gap-2">
 							<input

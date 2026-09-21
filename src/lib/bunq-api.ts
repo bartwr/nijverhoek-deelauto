@@ -115,16 +115,29 @@ export interface BunqMonetaryAccountSummary {
 
 /**
  * Which `permitted_ips` strategy bunq accepted when registering the device.
- * - `wildcard`: `[ip, '*']`, calls allowed from any IP address.
+ * - `wildcard`: `['*']` was sent. bunq does **not** turn this into a
+ *   wildcard credential (that is only possible from the bunq app); it binds
+ *   the device to the IP address the request came from.
  * - `calling-ip`: `permitted_ips` omitted, bunq bound the IP it saw.
  * - `detected-ip`: only the externally detected IP address.
+ *
+ * In every mode the device is IP-bound unless "Allow all IP addresses" is
+ * enabled on the API key in the bunq app.
  */
 export type BunqDeviceIpMode = 'wildcard' | 'calling-ip' | 'detected-ip'
+
+/**
+ * Warning appended to every successful registration. Vercel functions do
+ * not have a stable egress IP, so an IP-bound device fails intermittently.
+ */
+const IP_BINDING_WARNING =
+	'bunq binds the device to that single IP unless "Allow all IP addresses" ' +
+	'is enabled on this API key in the bunq app; on Vercel that setting is ' +
+	'required, otherwise calls fail as soon as the egress IP changes.'
 
 function describeIpMode (mode: BunqDeviceIpMode, detectedIp: string): string {
 	switch (mode) {
 		case 'wildcard':
-			return 'all IP addresses allowed'
 		case 'calling-ip':
 			return 'bound to the IP address bunq saw on the request'
 		case 'detected-ip':
@@ -1134,9 +1147,11 @@ class BunqApiClient {
 	 * an external service is not necessarily the IP bunq sees, and bunq then
 	 * answers "Incorrect API key or IP address". Order of attempts:
 	 *
-	 * 1. `[detectedIp, '*']`: wildcard, IP-independent (skipped when
-	 *    `BUNQ_ALLOW_ALL_IPS=false`).
-	 * 2. `permitted_ips` omitted: bunq binds the IP it sees on the request.
+	 * 1. `['*']`: bunq binds the IP it sees on the request. Despite the
+	 *    older tutorial text this does not create a wildcard credential; only
+	 *    "Allow all IP addresses" in the bunq app does. Skipped when
+	 *    `BUNQ_ALLOW_ALL_IPS=false`.
+	 * 2. `permitted_ips` omitted: same effect, different request shape.
 	 * 3. `[detectedIp]`: the previous behaviour.
 	 *
 	 * A "device already exists" error is rethrown immediately since retrying
@@ -1152,7 +1167,7 @@ class BunqApiClient {
 
 		const attempts: Array<{ mode: BunqDeviceIpMode; permittedIps?: string[] }> = []
 		if (allowWildcard) {
-			attempts.push({ mode: 'wildcard', permittedIps: hasDetectedIp ? [detectedIp, '*'] : ['*'] })
+			attempts.push({ mode: 'wildcard', permittedIps: ['*'] })
 		}
 		attempts.push({ mode: 'calling-ip' })
 		if (hasDetectedIp) {
@@ -1225,7 +1240,7 @@ class BunqApiClient {
 				ipMode,
 				installationToken,
 				message:
-					`Device registered (${describeIpMode(ipMode, ipAddress)}). ` +
+					`Device registered (${describeIpMode(ipMode, ipAddress)}). ${IP_BINDING_WARNING} ` +
 					'Store the installation token as BUNQ_INSTALLATION_RESPONSE_TOKEN and redeploy.'
 			}
 		} catch (error) {
