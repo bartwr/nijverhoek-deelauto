@@ -6,8 +6,9 @@ import {
 	getDefaultReservationWindow,
 } from '@/lib/deelauto-api'
 import { CalendarEvent, generateIcsCalendar } from '@/lib/ical-generator'
+import { EUROPE_AMSTERDAM } from '@/lib/zoned-time'
 
-const TIME_ZONE = 'Europe/Amsterdam'
+const TIME_ZONE = EUROPE_AMSTERDAM
 const CALENDAR_NAME = 'Deelauto Nijverhoek'
 const CALENDAR_DESCRIPTION = 'Reserveringen van de deelauto in de Nijverhoek'
 const REFRESH_INTERVAL = 'PT15M'

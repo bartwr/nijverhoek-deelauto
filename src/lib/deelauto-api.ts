@@ -1,4 +1,9 @@
 import { createHash } from 'crypto'
+import {
+	EUROPE_AMSTERDAM,
+	naiveTimestampAsUtcIso,
+	parseDateTimeInTimeZone,
+} from '@/lib/zoned-time'
 
 const DEFAULT_API_BASE_URL = 'https://carsharing.themobilityfactory.coop'
 const DEFAULT_ADMIN_GROUP = 'coop'
@@ -143,10 +148,7 @@ export function getDefaultReservationWindow (
 }
 
 function parseDate (value: string | undefined): Date | undefined {
-	if (!value) return undefined
-
-	const parsed = new Date(value)
-	return Number.isNaN(parsed.getTime()) ? undefined : parsed
+	return parseDateTimeInTimeZone(value, EUROPE_AMSTERDAM)
 }
 
 /**
@@ -156,10 +158,16 @@ function parseDate (value: string | undefined): Date | undefined {
  */
 function buildReservationUid (
 	vehicleServiceUnitId: string,
+	startRaw: string,
+	endRaw: string,
 	start: Date,
 	end: Date
 ): string {
-	const fingerprint = `${vehicleServiceUnitId}|${start.toISOString()}|${end.toISOString()}`
+	const fingerprint = [
+		vehicleServiceUnitId,
+		naiveTimestampAsUtcIso(startRaw, start),
+		naiveTimestampAsUtcIso(endRaw, end),
+	].join('|')
 	const digest = createHash('sha1').update(fingerprint).digest('hex')
 
 	return `${digest}@auto.nijverhoek.nl`
@@ -215,7 +223,13 @@ async function fetchReservationsForVehicle (
 		if (!start || !end || end <= start) return reservations
 
 		reservations.push({
-			uid: buildReservationUid(vehicleServiceUnitId, start, end),
+			uid: buildReservationUid(
+				vehicleServiceUnitId,
+				item.startTime ?? '',
+				item.endTime ?? '',
+				start,
+				end
+			),
 			vehicleServiceUnitId,
 			start,
 			end,
